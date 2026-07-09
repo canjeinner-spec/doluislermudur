@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
-import { WebView, WebViewNavigation } from 'react-native-webview';
+import { WebView, WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -17,8 +17,30 @@ import type { RootStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WebViewLogin'>;
 
-/** URL fragments that indicate content playback has started (→ open the room). */
-const PLAYBACK_HINTS = ['/watch', 'watch?', '/play', '/video/', '/viewer', '/stream'];
+/**
+ * Injected into the login WebView: watches for a real, large <video> that is
+ * actually playing, then reports it once. This is how we know the user has
+ * logged in AND started the content — far more reliable than guessing from the
+ * URL (which jumped to the room before Prime was even signed in).
+ */
+const PLAYBACK_PROBE = `
+(function(){
+  if(window.__asteraProbe){return;} window.__asteraProbe=true;
+  var RNW=window.ReactNativeWebView;
+  function check(){
+    var list=document.querySelectorAll('video');
+    for(var i=0;i<list.length;i++){var v=list[i];
+      var big=(v.clientWidth*v.clientHeight)>(window.innerWidth*window.innerHeight*0.30);
+      if(big&&!v.paused&&v.currentTime>0&&v.readyState>2){
+        try{RNW.postMessage(JSON.stringify({t:'playing',url:location.href,title:document.title}));}catch(e){}
+        return;
+      }
+    }
+  }
+  setInterval(check,1000);
+})();
+true;
+`;
 
 /** Strip a provider suffix from the page title to name the room after content. */
 function cleanTitle(raw: string, providerName?: string): string {
@@ -52,20 +74,33 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
   const pageUrlRef = useRef(platform?.loginUrl ?? '');
   const finishedRef = useRef(false);
 
-  const finish = () => {
+  const finish = (url?: string, title?: string) => {
     if (finishedRef.current) return;
     finishedRef.current = true;
     const authed = storage.getJSON<string[]>(StorageKeys.authedPlatforms, []);
     if (!authed.includes(platformId)) {
       storage.setJSON(StorageKeys.authedPlatforms, [...authed, platformId]);
     }
-    const title = cleanTitle(pageTitleRef.current, platform?.name) || platform?.name || 'Oda';
-    const params = { draft, platformId, title, contentUrl: pageUrlRef.current };
+    const cleaned = cleanTitle(title ?? pageTitleRef.current, platform?.name) || platform?.name || 'Oda';
+    const params = { draft, platformId, title: cleaned, contentUrl: url ?? pageUrlRef.current };
     if (route.params.returnToRoom) {
       // Changing content: pop back to the existing room with the new video.
       navigation.navigate('Room', params);
     } else {
       navigation.replace('Room', params);
+    }
+  };
+
+  // The probe tells us content is actually playing → hand off to the room with
+  // the exact URL/title it saw. No more guessing from the URL and jumping early.
+  const onProbeMessage = (e: WebViewMessageEvent) => {
+    try {
+      const msg = JSON.parse(e.nativeEvent.data);
+      if (msg.t === 'playing' && typeof msg.url === 'string') {
+        finish(msg.url, msg.title);
+      }
+    } catch {
+      /* ignore */
     }
   };
 
@@ -77,14 +112,9 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
     // Parse with a regex rather than `new URL` (Hermes' URL is incomplete).
     const match = /^(\w+):\/\/([^/?#]+)([^?#]*)(\?[^#]*)?/.exec(nav.url);
     if (!match) return;
-    const [, scheme, host, pathname = '', search = ''] = match;
+    const [, scheme, host] = match;
     setDomain(host.replace(/^www\./, ''));
     setSecure(scheme === 'https');
-    // Move to the room the moment real playback starts.
-    const path = (pathname + search).toLowerCase();
-    if (!nav.loading && PLAYBACK_HINTS.some((h) => path.includes(h))) {
-      finish();
-    }
   };
 
   // Keep everything inside the WebView: allow web + about/data, block deep
@@ -151,6 +181,8 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
             ref={webRef}
             source={{ uri: platform.loginUrl }}
             style={styles.web}
+            injectedJavaScript={PLAYBACK_PROBE}
+            onMessage={onProbeMessage}
             onNavigationStateChange={onNavState}
             onLoadStart={() => {
               progress.value = withTiming(0.15, { duration: 120 });

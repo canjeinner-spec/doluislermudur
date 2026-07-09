@@ -6,6 +6,7 @@ export interface RoomDraft {
 }
 
 export type RootStackParamList = {
+  Onboarding: undefined;
   Home: undefined;
   Profile: undefined;
   CreateRoom: undefined;

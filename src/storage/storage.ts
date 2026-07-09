@@ -67,4 +67,5 @@ export const StorageKeys = {
   authedPlatforms: 'auth.platforms',
   settings: 'user.settings',
   displayName: 'user.displayName',
+  onboardingDone: 'onboarding.done',
 } as const;

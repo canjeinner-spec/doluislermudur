@@ -2,6 +2,8 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { palette } from '@/theme';
+import { storage, StorageKeys } from '@/storage/storage';
+import { OnboardingScreen } from '@/screens/OnboardingScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { CreateRoomScreen } from '@/screens/CreateRoomScreen';
@@ -18,8 +20,11 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
  * create-room flow (form sheet on iOS, full-screen elsewhere).
  */
 export function RootNavigator() {
+  const seenOnboarding = storage.getBool(StorageKeys.onboardingDone) === true;
+
   return (
     <Stack.Navigator
+      initialRouteName={seenOnboarding ? 'Home' : 'Onboarding'}
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: palette.background },
@@ -28,6 +33,11 @@ export function RootNavigator() {
         fullScreenGestureEnabled: true,
       }}
     >
+      <Stack.Screen
+        name="Onboarding"
+        component={OnboardingScreen}
+        options={{ animation: 'fade', gestureEnabled: false }}
+      />
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="CreateRoom" component={CreateRoomScreen} />

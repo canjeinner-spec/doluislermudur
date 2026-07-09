@@ -1,0 +1,239 @@
+import React, { useRef, useState } from 'react';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+import { WebView, WebViewNavigation } from 'react-native-webview';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+
+import { Icon, IconButton, NavBar, PressableScale, ScreenBackground } from '@/components';
+import { getPlatform } from '@/data';
+import { palette, spacing, typography } from '@/theme';
+import { storage, StorageKeys } from '@/storage/storage';
+import type { RootStackParamList } from '@/navigation/types';
+
+type Props = NativeStackScreenProps<RootStackParamList, 'WebViewLogin'>;
+
+/** Heuristics for "signed in" — the URL leaves the login/auth route. */
+const SUCCESS_HINTS = ['/browse', '/home', '/gallery', 'watch', 'account', 'profiles'];
+const LOGIN_HINTS = ['login', 'signin', 'sign-in', 'log_in', 'auth', 'ap/signin'];
+
+export function WebViewLoginScreen({ navigation, route }: Props) {
+  const insets = useSafeAreaInsets();
+  const { platformId, draft } = route.params;
+  const platform = getPlatform(platformId);
+  const webRef = useRef<WebView>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [canGoForward, setCanGoForward] = useState(false);
+  const [domain, setDomain] = useState(platform?.domain ?? '');
+  const [secure, setSecure] = useState(true);
+  const progress = useSharedValue(0);
+
+  const finish = () => {
+    const authed = storage.getJSON<string[]>(StorageKeys.authedPlatforms, []);
+    if (!authed.includes(platformId)) {
+      storage.setJSON(StorageKeys.authedPlatforms, [...authed, platformId]);
+    }
+    navigation.replace('Room', { draft, platformId });
+  };
+
+  const onNavState = (nav: WebViewNavigation) => {
+    setCanGoBack(nav.canGoBack);
+    setCanGoForward(nav.canGoForward);
+    try {
+      const url = new URL(nav.url);
+      setDomain(url.hostname.replace(/^www\./, ''));
+      setSecure(url.protocol === 'https:');
+      const path = (url.pathname + url.search).toLowerCase();
+      const looksLoggedIn =
+        !nav.loading &&
+        SUCCESS_HINTS.some((h) => path.includes(h)) &&
+        !LOGIN_HINTS.some((h) => path.includes(h));
+      if (looksLoggedIn) finish();
+    } catch {
+      /* non-URL navigation, ignore */
+    }
+  };
+
+  const barStyle = useAnimatedStyle(() => ({
+    width: `${progress.value * 100}%`,
+    opacity: progress.value > 0 && progress.value < 1 ? 1 : 0,
+  }));
+
+  return (
+    <ScreenBackground glow="none">
+      <NavBar
+        compact
+        left={
+          <PressableScale onPress={() => navigation.goBack()} accessibilityLabel="Kapat">
+            <Text style={[typography.body, styles.close]}>Kapat</Text>
+          </PressableScale>
+        }
+        titleNode={
+          <View style={styles.addressBar}>
+            <Icon
+              name={secure ? 'lock' : 'globe'}
+              size={12}
+              color={secure ? palette.textSecondary : palette.textTertiary}
+              strokeWidth={2}
+            />
+            <Text style={[typography.footnoteEmphasized, styles.domain]} numberOfLines={1}>
+              {domain}
+            </Text>
+          </View>
+        }
+        right={
+          <PressableScale onPress={finish} accessibilityLabel="Girişi tamamla">
+            <Text style={[typography.bodyEmphasized, styles.done]}>Bitti</Text>
+          </PressableScale>
+        }
+      />
+
+      <View style={styles.progressTrack}>
+        <Animated.View style={[styles.progressBar, barStyle]} />
+      </View>
+
+      <View style={styles.webWrap}>
+        {platform && (
+          <WebView
+            ref={webRef}
+            source={{ uri: platform.loginUrl }}
+            style={styles.web}
+            onNavigationStateChange={onNavState}
+            onLoadStart={() => {
+              setLoading(true);
+              progress.value = withTiming(0.15, { duration: 120 });
+            }}
+            onLoadProgress={({ nativeEvent }) => {
+              progress.value = withTiming(nativeEvent.progress, { duration: 120 });
+            }}
+            onLoadEnd={() => {
+              setLoading(false);
+              progress.value = withTiming(1, { duration: 160 });
+            }}
+            startInLoadingState
+            renderLoading={() => <View />}
+            decelerationRate="normal"
+            allowsBackForwardNavigationGestures
+            sharedCookiesEnabled
+            thirdPartyCookiesEnabled
+            userAgent={
+              Platform.OS === 'ios'
+                ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+                : undefined
+            }
+          />
+        )}
+        {loading && (
+          <View style={styles.loader} pointerEvents="none">
+            <ActivityIndicator color={palette.amber} />
+          </View>
+        )}
+      </View>
+
+      <View style={styles.notice}>
+        <Icon name="lock" size={13} color={palette.textTertiary} strokeWidth={2} />
+        <Text style={[typography.caption1, styles.noticeText]}>
+          Bu sayfa {platform?.name} tarafından sunulur. ASTERA şifreni görmez.
+        </Text>
+      </View>
+
+      {/* Browser toolbar */}
+      <View style={[styles.toolbar, { paddingBottom: insets.bottom + spacing.xs }]}>
+        <IconButton
+          icon="chevron-left"
+          variant="plain"
+          color={canGoBack ? palette.textPrimary : palette.textQuaternary}
+          accessibilityLabel="Geri"
+          onPress={() => canGoBack && webRef.current?.goBack()}
+        />
+        <IconButton
+          icon="chevron-right"
+          variant="plain"
+          color={canGoForward ? palette.textPrimary : palette.textQuaternary}
+          accessibilityLabel="İleri"
+          onPress={() => canGoForward && webRef.current?.goForward()}
+        />
+        <IconButton
+          icon="repeat"
+          variant="plain"
+          accessibilityLabel="Yenile"
+          onPress={() => webRef.current?.reload()}
+        />
+        <IconButton icon="share" variant="plain" accessibilityLabel="Paylaş" />
+      </View>
+    </ScreenBackground>
+  );
+}
+
+const styles = StyleSheet.create({
+  close: {
+    color: palette.amber,
+  },
+  done: {
+    color: palette.amber,
+  },
+  addressBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: palette.surfaceSecondary,
+    maxWidth: 200,
+  },
+  domain: {
+    color: palette.textPrimary,
+  },
+  progressTrack: {
+    height: 2,
+    backgroundColor: 'transparent',
+  },
+  progressBar: {
+    height: 2,
+    backgroundColor: palette.copper,
+  },
+  webWrap: {
+    flex: 1,
+    backgroundColor: palette.white,
+  },
+  web: {
+    flex: 1,
+    backgroundColor: palette.white,
+  },
+  loader: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0d0d0d',
+  },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: palette.background,
+  },
+  noticeText: {
+    color: palette.textTertiary,
+    textAlign: 'center',
+  },
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingTop: spacing.xs,
+    paddingHorizontal: spacing.xl,
+    backgroundColor: palette.background,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: palette.separator,
+  },
+});

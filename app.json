@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Astera",
+    "slug": "astera",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "astera",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "backgroundColor": "#090909",
+      "resizeMode": "contain",
+      "image": "./assets/splash.png"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.astera.watchparty",
+      "userInterfaceStyle": "dark",
+      "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": true
+      }
+    },
+    "android": {
+      "package": "com.astera.watchparty",
+      "userInterfaceStyle": "dark",
+      "adaptiveIcon": {
+        "backgroundColor": "#090909",
+        "foregroundImage": "./assets/adaptive-icon.png"
+      }
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "ios": { "deploymentTarget": "15.1" },
+          "android": { "minSdkVersion": 24 }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": { "projectId": "00000000-0000-0000-0000-000000000000" }
+    }
+  }
+}

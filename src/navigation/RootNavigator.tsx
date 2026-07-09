@@ -43,11 +43,7 @@ export function RootNavigator() {
         }}
       />
       <Stack.Screen name="PlatformSelect" component={PlatformSelectScreen} />
-      <Stack.Screen
-        name="WebViewLogin"
-        component={WebViewLoginScreen}
-        options={{ animation: 'slide_from_bottom' }}
-      />
+      <Stack.Screen name="WebViewLogin" component={WebViewLoginScreen} />
       <Stack.Screen
         name="Room"
         component={RoomScreen}

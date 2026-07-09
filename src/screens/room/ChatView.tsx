@@ -9,18 +9,27 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { Avatar, Icon, IconButton, PressableScale } from '@/components';
 import { CHAT_SEED, CURRENT_USER, type ChatMessage } from '@/data';
 import { palette, radius, spacing, typography } from '@/theme';
 
-const QUICK_EMOJI = ['🔥', '😂', '❤️', '👏', '🍿', '😮', '💯', '👀'];
+type Props = {
+  bottomInset: number;
+  nowPlaying: string;
+  inviteCode?: string;
+};
 
-/** Compact chat: small avatars, tight bubbles, timestamps, and a composer. */
-export function ChatView({ bottomInset }: { bottomInset: number }) {
+/**
+ * Rave-style chat: bubble-less messages floating on a warm gradient. Other
+ * people sit on the left with an avatar + name; the local user's lines are
+ * right-aligned plain text. System notices (now-playing, invite, joins) are
+ * woven into the stream.
+ */
+export function ChatView({ bottomInset, nowPlaying, inviteCode = '8F3K2Q' }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>(CHAT_SEED);
   const [draft, setDraft] = useState('');
-  const [emojiOpen, setEmojiOpen] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   const send = useCallback(() => {
@@ -37,18 +46,42 @@ export function ChatView({ bottomInset }: { bottomInset: number }) {
     };
     setMessages((prev) => [...prev, msg]);
     setDraft('');
-    setEmojiOpen(false);
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   }, [draft]);
 
   return (
     <View style={styles.root}>
+      {/* Warm cinematic wash behind the chat, like Rave's album-art bleed. */}
+      <LinearGradient
+        colors={['rgba(122,74,44,0.28)', 'rgba(60,37,23,0.16)', 'rgba(9,9,9,0)']}
+        start={{ x: 0.2, y: 0 }}
+        end={{ x: 0.9, y: 1 }}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+
       <FlatList
         ref={listRef}
         data={messages}
         keyExtractor={(m) => m.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <View style={styles.systemRow}>
+              <Icon name="sparkle" size={14} color={palette.amber} filled />
+              <Text style={styles.systemText}>
+                Şimdi <Text style={styles.systemStrong}>{nowPlaying}</Text> oynatılıyor
+              </Text>
+            </View>
+            <View style={styles.systemRow}>
+              <Icon name="share" size={13} color={palette.textTertiary} />
+              <Text style={styles.inviteText}>
+                Davet linki: <Text style={styles.inviteLink}>astera.app/join/{inviteCode}</Text>
+              </Text>
+            </View>
+          </View>
+        }
         renderItem={({ item, index }) => (
           <MessageRow message={item} prev={messages[index - 1]} />
         )}
@@ -57,52 +90,31 @@ export function ChatView({ bottomInset }: { bottomInset: number }) {
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={100}
+        keyboardVerticalOffset={90}
       >
-        {emojiOpen && (
-          <Animated.View entering={FadeIn.duration(160)} style={styles.emojiRow}>
-            {QUICK_EMOJI.map((e) => (
-              <PressableScale
-                key={e}
-                onPress={() => setDraft((d) => d + e)}
-                activeScale={0.85}
-                accessibilityLabel={`Emoji ${e}`}
-              >
-                <View style={styles.emojiChip}>
-                  <Text style={styles.emoji}>{e}</Text>
-                </View>
-              </PressableScale>
-            ))}
-          </Animated.View>
-        )}
-
         <View style={[styles.composer, { paddingBottom: bottomInset + spacing.sm }]}>
-          <IconButton
-            icon="emoji"
-            size={38}
-            iconSize={20}
-            variant="plain"
-            color={emojiOpen ? palette.amber : palette.textSecondary}
-            accessibilityLabel="Emoji"
-            onPress={() => setEmojiOpen((o) => !o)}
-          />
-          <View style={styles.inputWrap}>
-            <TextInputRow value={draft} onChange={setDraft} onSubmit={send} />
-            <IconButton
-              icon="attach"
-              size={30}
-              iconSize={18}
-              variant="plain"
-              color={palette.textTertiary}
-              accessibilityLabel="Dosya ekle"
-            />
+          <View style={styles.micBtn}>
+            <Icon name="volume" size={19} color={palette.background} />
           </View>
-          <PressableScale
-            onPress={send}
-            activeScale={0.88}
-            disabled={!draft.trim()}
-            accessibilityLabel="Gönder"
-          >
+          <View style={styles.inputPill}>
+            <TextInput
+              style={[typography.body, styles.input]}
+              value={draft}
+              onChangeText={setDraft}
+              placeholder="Sohbet"
+              placeholderTextColor={palette.textTertiary}
+              selectionColor={palette.amber}
+              cursorColor={palette.amber}
+              keyboardAppearance="dark"
+              multiline
+              onSubmitEditing={send}
+              blurOnSubmit={false}
+              returnKeyType="send"
+            />
+            <IconButton icon="emoji" size={30} iconSize={19} variant="plain" color={palette.textTertiary} accessibilityLabel="Emoji" />
+            <IconButton icon="attach" size={30} iconSize={18} variant="plain" color={palette.textTertiary} accessibilityLabel="Ekle" />
+          </View>
+          <PressableScale onPress={send} activeScale={0.88} disabled={!draft.trim()} accessibilityLabel="Gönder">
             <View style={[styles.send, !draft.trim() && styles.sendDisabled]}>
               <Icon name="send" size={19} color={palette.white} filled />
             </View>
@@ -113,179 +125,89 @@ export function ChatView({ bottomInset }: { bottomInset: number }) {
   );
 }
 
-function TextInputRow({
-  value,
-  onChange,
-  onSubmit,
-}: {
-  value: string;
-  onChange: (t: string) => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <TextInput
-      style={[typography.body, styles.input]}
-      value={value}
-      onChangeText={onChange}
-      placeholder="Mesaj yaz…"
-      placeholderTextColor={palette.textTertiary}
-      selectionColor={palette.amber}
-      cursorColor={palette.amber}
-      keyboardAppearance="dark"
-      multiline
-      onSubmitEditing={onSubmit}
-      blurOnSubmit={false}
-      returnKeyType="send"
-    />
-  );
-}
-
 function MessageRow({ message, prev }: { message: ChatMessage; prev?: ChatMessage }) {
-  const grouped = prev?.authorId === message.authorId;
+  const grouped = prev?.authorId === message.authorId && prev?.mine === message.mine;
+
   if (message.mine) {
     return (
-      <Animated.View entering={FadeIn.duration(180)} style={[styles.rowMine, grouped && styles.grouped]}>
-        <View style={styles.mineCol}>
-          <View style={[styles.bubble, styles.bubbleMine]}>
-            <Text style={[typography.subhead, styles.mineText]}>{message.text}</Text>
-          </View>
-          <Text style={[typography.caption2, styles.timeMine]}>{message.time}</Text>
-        </View>
+      <Animated.View entering={FadeIn.duration(160)} style={styles.mineRow}>
+        <Text style={[typography.body, styles.mineText]}>{message.text}</Text>
       </Animated.View>
     );
   }
+
   return (
-    <Animated.View entering={FadeIn.duration(180)} style={[styles.row, grouped && styles.grouped]}>
+    <Animated.View entering={FadeIn.duration(160)} style={[styles.otherRow, grouped && styles.grouped]}>
       <View style={styles.avatarCol}>
-        {!grouped ? (
-          <Avatar name={message.authorName} tint={message.tint} size={30} />
-        ) : (
-          <View style={{ width: 30 }} />
-        )}
+        {!grouped ? <Avatar name={message.authorName} tint={message.tint} size={30} /> : <View style={{ width: 30 }} />}
       </View>
-      <View style={styles.col}>
-        {!grouped && (
-          <View style={styles.nameRow}>
-            <Text style={[typography.footnoteEmphasized, { color: message.tint }]}>
-              {message.authorName}
-            </Text>
-            <Text style={[typography.caption2, styles.time]}>{message.time}</Text>
-          </View>
-        )}
-        <View style={[styles.bubble, styles.bubbleTheirs]}>
-          <Text style={[typography.subhead, styles.text]}>{message.text}</Text>
-        </View>
-      </View>
+      <Text style={[typography.body, styles.otherText]}>
+        {!grouped && <Text style={[styles.otherName, { color: message.tint }]}>{message.authorName}  </Text>}
+        {message.text}
+      </Text>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
+  root: { flex: 1 },
   list: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.md,
+    gap: spacing.md,
+  },
+  header: {
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  systemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
   },
-  row: {
+  systemText: { ...typography.footnote, color: palette.textSecondary, flex: 1 },
+  systemStrong: { color: palette.textPrimary, fontWeight: '700' },
+  inviteText: { ...typography.footnote, color: palette.textTertiary, flex: 1 },
+  inviteLink: { color: palette.amber, fontWeight: '600', textDecorationLine: 'underline' },
+  otherRow: {
     flexDirection: 'row',
     gap: spacing.sm,
-    alignItems: 'flex-end',
-  },
-  rowMine: {
-    alignItems: 'flex-end',
-  },
-  grouped: {
-    marginTop: -spacing.xs,
-  },
-  avatarCol: {
-    width: 30,
-    justifyContent: 'flex-end',
-  },
-  col: {
-    flex: 1,
-    gap: 3,
     alignItems: 'flex-start',
   },
-  mineCol: {
-    maxWidth: '82%',
+  grouped: { marginTop: -spacing.sm + 2 },
+  avatarCol: { width: 30, paddingTop: 1 },
+  otherText: { flex: 1, color: palette.textPrimary },
+  otherName: { fontWeight: '800' },
+  mineRow: {
     alignItems: 'flex-end',
-    gap: 3,
+    paddingLeft: 48,
   },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  bubble: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    maxWidth: '92%',
-  },
-  bubbleTheirs: {
-    backgroundColor: palette.surfaceSecondary,
-    borderTopLeftRadius: 4,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: palette.glassBorder,
-  },
-  bubbleMine: {
-    backgroundColor: palette.ember,
-    borderTopRightRadius: 4,
-  },
-  text: {
-    color: palette.textPrimary,
-  },
-  mineText: {
-    color: palette.white,
-  },
-  time: {
-    color: palette.textTertiary,
-  },
-  timeMine: {
-    color: palette.textTertiary,
-    marginRight: spacing.xs,
-  },
-  emojiRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-  },
-  emojiChip: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: palette.surfaceSecondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emoji: {
-    fontSize: 20,
-  },
+  mineText: { color: palette.amberBright, textAlign: 'right', fontWeight: '500' },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: palette.separator,
-    backgroundColor: 'rgba(9,9,9,0.85)',
   },
-  inputWrap: {
+  micBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: palette.textPrimary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inputPill: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
     minHeight: 44,
-    paddingLeft: spacing.md,
+    paddingLeft: spacing.lg,
     paddingRight: spacing.xs,
     borderRadius: radius.xl,
-    backgroundColor: palette.surfaceSecondary,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: palette.glassBorder,
   },
@@ -303,8 +225,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendDisabled: {
-    backgroundColor: palette.surfaceElevated,
-    opacity: 0.7,
-  },
+  sendDisabled: { backgroundColor: palette.surfaceElevated, opacity: 0.6 },
 });

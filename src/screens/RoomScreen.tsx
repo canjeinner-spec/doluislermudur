@@ -9,15 +9,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import {
-  AvatarStack,
   BottomSheet,
   Icon,
   IconButton,
   ListRow,
-  NavBar,
   PlatformLogo,
+  PressableScale,
   ScreenBackground,
-  SegmentedControl,
   VideoPlayer,
   WebPlayer,
 } from '@/components';
@@ -36,8 +34,6 @@ import { ChatView } from './room/ChatView';
 import { UsersPanel } from './room/UsersPanel';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Room'>;
-
-type Tab = 'chat' | 'users';
 
 /** Build a Room from an existing id, or synthesize one from the create draft. */
 function useRoom(params: Props['route']['params']): Room {
@@ -73,247 +69,149 @@ function useRoom(params: Props['route']['params']): Room {
 export function RoomScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const room = useRoom(route.params);
-  const [tab, setTab] = useState<Tab>('chat');
   const [inviteOpen, setInviteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [usersOpen, setUsersOpen] = useState(false);
 
-  // Slide-over: Users panel rides in from the right over the chat.
-  const panelProgress = useSharedValue(0);
-  const setTabAnimated = (next: string) => {
-    const t = next as Tab;
-    setTab(t);
-    panelProgress.value = withTiming(t === 'users' ? 1 : 0, { duration: 280 });
+  const usersProgress = useSharedValue(0);
+  const openUsers = () => {
+    setUsersOpen(true);
+    usersProgress.value = withTiming(1, { duration: 280 });
+  };
+  const closeUsers = () => {
+    usersProgress.value = withTiming(0, { duration: 240 });
+    setTimeout(() => setUsersOpen(false), 240);
   };
 
-  const panelStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: (1 - panelProgress.value) * 40 }],
-    opacity: panelProgress.value,
+  const usersStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: (1 - usersProgress.value) * 400 }],
   }));
-  const chatStyle = useAnimatedStyle(() => ({
-    opacity: 1 - panelProgress.value,
-  }));
-
-  const onlineCount = room.participants.filter((p) => p.online).length;
+  const scrimStyle = useAnimatedStyle(() => ({ opacity: usersProgress.value }));
 
   return (
     <ScreenBackground glow="none">
-      <NavBar
-        left={
-          <IconButton
-            icon="chevron-down"
-            accessibilityLabel="Odadan çık"
-            variant="glass"
-            onPress={() => navigation.goBack()}
-          />
-        }
-        titleNode={
-          <View style={styles.titleWrap}>
-            <View style={styles.titleRow}>
-              <Text style={[typography.headline, styles.title]} numberOfLines={1}>
-                {room.title}
-              </Text>
-              <Icon name="crown" size={13} color={palette.amber} filled />
-            </View>
-            <View style={styles.subRow}>
-              <PlatformLogo id={room.platform} size={12} />
-              <Text style={[typography.caption2, styles.sub]} numberOfLines={1}>
-                {room.platformLabel} · {room.hostName}
-              </Text>
-            </View>
+      {/* Top bar — X + settings · title · invite + participants */}
+      <View style={[styles.topBar, { paddingTop: insets.top + spacing.xs }]}>
+        <View style={styles.topSide}>
+          <IconButton icon="close" size={38} variant="glass" accessibilityLabel="Odadan çık" onPress={() => navigation.goBack()} />
+          <IconButton icon="settings" size={38} variant="glass" accessibilityLabel="Oda ayarları" onPress={() => setSettingsOpen(true)} />
+        </View>
+        <View style={styles.titleWrap} pointerEvents="none">
+          <Text style={[typography.subheadEmphasized, styles.title]} numberOfLines={1}>
+            {room.title}
+          </Text>
+          <View style={styles.subRow}>
+            <PlatformLogo id={room.platform} size={12} />
+            <Text style={[typography.caption2, styles.sub]} numberOfLines={1}>
+              {room.platformLabel}
+            </Text>
           </View>
-        }
-        right={
-          <>
-            <IconButton
-              icon="cast"
-              size={38}
-              accessibilityLabel="Yayınla"
-              variant="glass"
-            />
-            <IconButton
-              icon="settings"
-              size={38}
-              accessibilityLabel="Oda ayarları"
-              variant="glass"
-              onPress={() => setSettingsOpen(true)}
-            />
-          </>
-        }
-      />
-
-      {/* Participant strip */}
-      <View style={styles.participantsRow}>
-        <AvatarStack
-          participants={room.participants}
-          max={6}
-          size={34}
-          overflowCount={Math.max(0, room.participantCount - 6)}
-          ringColor={palette.background}
-        />
-        <View style={styles.spacer} />
-        <View style={styles.onlinePill}>
-          <View style={styles.onlineDot} />
-          <Text style={[typography.caption1, styles.onlineText]}>{onlineCount} çevrimiçi</Text>
+        </View>
+        <View style={[styles.topSide, styles.topRight]}>
+          <IconButton icon="person-add" size={38} variant="glass" accessibilityLabel="Davet et" onPress={() => setInviteOpen(true)} />
+          <PressableCount count={room.participantCount} onPress={openUsers} />
         </View>
       </View>
 
-      {/* Player: real provider WebView for created rooms (login / browse / play
-          all happen here, like Turtle), decorative player for the sample rooms. */}
+      {/* Player */}
       <View style={styles.playerWrap}>
         {route.params.contentUrl ? (
-          <WebPlayer
-            uri={route.params.contentUrl}
-            userAgent={userAgentFor(room.platform, Platform.OS)}
-          />
+          <WebPlayer uri={route.params.contentUrl} userAgent={userAgentFor(room.platform, Platform.OS)} />
         ) : (
           <VideoPlayer posterIndex={room.posterIndex} />
         )}
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabsWrap}>
-        <SegmentedControl
-          value={tab}
-          onChange={setTabAnimated}
-          segments={[
-            { key: 'chat', label: 'Sohbet', badge: 12 },
-            { key: 'users', label: 'Kullanıcılar', badge: room.participantCount },
-          ]}
-        />
-      </View>
+      {/* Chat fills the rest of the screen */}
+      <ChatView bottomInset={insets.bottom} nowPlaying={room.title} />
 
-      {/* Content region: chat with a users slide-over above it */}
-      <View style={styles.content}>
-        <Animated.View style={[StyleSheet.absoluteFill, chatStyle]} pointerEvents={tab === 'chat' ? 'auto' : 'none'}>
-          <ChatView bottomInset={insets.bottom} />
-        </Animated.View>
-        <Animated.View
-          style={[StyleSheet.absoluteFill, styles.panel, panelStyle]}
-          pointerEvents={tab === 'users' ? 'auto' : 'none'}
-        >
-          <UsersPanel
-            participants={room.participants}
-            bottomInset={insets.bottom}
-            onInvite={() => setInviteOpen(true)}
-          />
-        </Animated.View>
-      </View>
+      {/* Users slide-over from the right */}
+      {usersOpen && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, scrimStyle]} onTouchEnd={closeUsers} />
+          <Animated.View style={[styles.usersPanel, { paddingTop: insets.top + spacing.sm }, usersStyle]}>
+            <View style={styles.usersHeader}>
+              <Text style={[typography.title3, styles.usersTitle]}>Kullanıcılar</Text>
+              <IconButton icon="close" size={32} iconSize={16} variant="solid" accessibilityLabel="Kapat" onPress={closeUsers} />
+            </View>
+            <UsersPanel participants={room.participants} bottomInset={insets.bottom} onInvite={() => { closeUsers(); setTimeout(() => setInviteOpen(true), 260); }} />
+          </Animated.View>
+        </View>
+      )}
 
-      <BottomSheet
-        visible={inviteOpen}
-        onClose={() => setInviteOpen(false)}
-        title="Arkadaş Davet Et"
-        height={0.7}
-      >
+      <BottomSheet visible={inviteOpen} onClose={() => setInviteOpen(false)} title="Arkadaş Davet Et" height={0.7}>
         <InviteFriendsSheet roomName={room.title} />
       </BottomSheet>
 
-      <BottomSheet
-        visible={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        title="Oda"
-        height={0.42}
-      >
+      <BottomSheet visible={settingsOpen} onClose={() => setSettingsOpen(false)} title="Oda" height={0.42}>
         <View style={styles.actions}>
-          <ListRow
-            title="Arkadaş Davet Et"
-            subtitle="Bu odaya davet linki gönder"
-            leadingIcon="person-add"
-            showChevron
-            onPress={() => {
-              setSettingsOpen(false);
-              setTimeout(() => setInviteOpen(true), 220);
-            }}
-          />
-          <ListRow
-            title="Davet Linkini Kopyala"
-            subtitle="astera.app/join/8F3K2Q"
-            leadingIcon="share"
-            showChevron
-            onPress={() => setSettingsOpen(false)}
-          />
-          <ListRow
-            title="Odadan Ayrıl"
-            leadingIcon="chevron-left"
-            leadingTint={palette.danger}
-            destructive
-            onPress={() => {
-              setSettingsOpen(false);
-              setTimeout(() => navigation.goBack(), 200);
-            }}
-          />
+          <ListRow title="Arkadaş Davet Et" subtitle="Bu odaya davet linki gönder" leadingIcon="person-add" showChevron onPress={() => { setSettingsOpen(false); setTimeout(() => setInviteOpen(true), 220); }} />
+          <ListRow title="Davet Linkini Kopyala" subtitle="astera.app/join/8F3K2Q" leadingIcon="share" showChevron onPress={() => setSettingsOpen(false)} />
+          <ListRow title="Odadan Ayrıl" leadingIcon="close" leadingTint={palette.danger} destructive onPress={() => { setSettingsOpen(false); setTimeout(() => navigation.goBack(), 200); }} />
         </View>
       </BottomSheet>
     </ScreenBackground>
   );
 }
 
+function PressableCount({ count, onPress }: { count: number; onPress: () => void }) {
+  return (
+    <PressableScale onPress={onPress} activeScale={0.9} accessibilityLabel={`${count} katılımcı`}>
+      <View style={styles.countBtn}>
+        <Icon name="users" size={18} color={palette.textPrimary} />
+        <Text style={[typography.footnoteEmphasized, styles.countText]}>{count}</Text>
+      </View>
+    </PressableScale>
+  );
+}
+
 const styles = StyleSheet.create({
-  titleWrap: {
-    alignItems: 'center',
-    gap: 1,
-  },
-  titleRow: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+    gap: spacing.sm,
   },
-  title: {
-    color: palette.textPrimary,
-    maxWidth: 180,
+  topSide: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  topRight: { justifyContent: 'flex-end' },
+  titleWrap: { flex: 1, alignItems: 'center', gap: 1 },
+  title: { color: palette.textPrimary, maxWidth: 180 },
+  subRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  sub: { color: palette.textSecondary },
+  playerWrap: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  scrim: { backgroundColor: 'rgba(0,0,0,0.5)' },
+  usersPanel: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: '86%',
+    backgroundColor: palette.surface,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: palette.separatorStrong,
   },
-  subRow: {
+  usersHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-  },
-  sub: {
-    color: palette.textSecondary,
-  },
-  participantsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
   },
-  spacer: {
-    flex: 1,
-  },
-  onlinePill: {
+  usersTitle: { color: palette.textPrimary },
+  actions: { gap: spacing.sm, paddingTop: spacing.xs },
+  countBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
+    height: 38,
     paddingHorizontal: spacing.md,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(78,208,138,0.12)',
+    borderRadius: 19,
+    backgroundColor: palette.glass,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.glassBorder,
   },
-  onlineDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: palette.online,
-  },
-  onlineText: {
-    color: palette.online,
-    fontWeight: '600',
-  },
-  playerWrap: {
-    paddingHorizontal: spacing.lg,
-  },
-  tabsWrap: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  content: {
-    flex: 1,
-  },
-  panel: {
-    backgroundColor: palette.background,
-  },
-  actions: {
-    gap: spacing.sm,
-    paddingTop: spacing.xs,
-  },
+  countText: { color: palette.textPrimary },
 });
+

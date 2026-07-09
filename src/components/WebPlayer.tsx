@@ -194,6 +194,9 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
         thirdPartyCookiesEnabled
         domStorageEnabled
         javaScriptEnabled
+        allowsProtectedMedia
+        androidLayerType="hardware"
+        mixedContentMode="always"
         originWhitelist={['http://*', 'https://*', 'about:*', 'data:*']}
         onShouldStartLoadWithRequest={(r) =>
           r.url.startsWith('http') || r.url.startsWith('about:') || r.url.startsWith('data:')

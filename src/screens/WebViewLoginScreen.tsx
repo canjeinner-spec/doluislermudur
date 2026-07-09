@@ -163,6 +163,11 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
             allowsBackForwardNavigationGestures
             sharedCookiesEnabled
             thirdPartyCookiesEnabled
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            allowsProtectedMedia
+            androidLayerType="hardware"
+            mixedContentMode="always"
             originWhitelist={['http://*', 'https://*', 'about:*', 'data:*']}
             onShouldStartLoadWithRequest={onShouldStartLoad}
             setSupportMultipleWindows={false}

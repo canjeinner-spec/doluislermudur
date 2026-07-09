@@ -2,7 +2,7 @@ import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -14,7 +14,7 @@ import type { RootStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
 
-// Warm peach→copper wash matching the "Başlayalım" button baked into the art.
+const IMG_RATIO = 853 / 1844; // width / height of the artwork
 const PRIMARY_GRADIENT = ['#EDBF95', '#D3925E', '#B06B3E'] as const;
 
 function ArrowRight() {
@@ -32,9 +32,10 @@ function ArrowRight() {
 }
 
 /**
- * First-run onboarding. The supplied artwork (logo, tagline, dots) is the
- * full-bleed background; we fade its lower edge into black and lay real,
- * functional buttons over the "Başlayalım" / "Giriş Yap" positions.
+ * First-run onboarding. The artwork (photo + ASTERA logo + tagline + subtitle)
+ * is shown whole — pinned to full width and the top, so nothing is cropped —
+ * and the two real buttons drop into the empty black space the art leaves at
+ * the bottom.
  */
 export function OnboardingScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
@@ -47,28 +48,25 @@ export function OnboardingScreen({ navigation }: Props) {
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      <Image source={require('../../assets/onboarding.png')} style={StyleSheet.absoluteFill} resizeMode="cover" />
 
-      {/* Keep the baked logo / tagline / subtitle (all above ~76%) crisp, then
-          go solid black below so the baked dots + buttons vanish and our real
-          controls sit on a clean footer. Measured against the artwork layout. */}
+      {/* Full width, pinned to the top, natural aspect ratio → the whole
+          composition is visible and its black lower third meets the black
+          background seamlessly. */}
+      <Image source={require('../../assets/onboarding.png')} style={styles.art} resizeMode="cover" />
+
+      {/* Gentle fade into pure black at the very bottom so the buttons always
+          sit on a clean field regardless of device height. */}
       <LinearGradient
-        colors={['rgba(9,9,9,0)', 'rgba(9,9,9,0)', palette.background, palette.background]}
-        locations={[0, 0.76, 0.805, 1]}
-        style={StyleSheet.absoluteFill}
+        colors={['rgba(9,9,9,0)', palette.background]}
+        locations={[0, 1]}
+        style={styles.bottomFade}
         pointerEvents="none"
       />
 
       <Animated.View
-        entering={FadeInDown.duration(500).delay(120)}
-        style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}
+        entering={FadeIn.duration(500).delay(150)}
+        style={[styles.footer, { paddingBottom: insets.bottom + spacing.xl }]}
       >
-        <View style={styles.dots}>
-          <View style={[styles.dot, styles.dotActive]} />
-          <View style={styles.dot} />
-          <View style={styles.dot} />
-        </View>
-
         <PressableScale onPress={enter} activeScale={0.97} accessibilityLabel="Başlayalım">
           <LinearGradient
             colors={PRIMARY_GRADIENT}
@@ -95,32 +93,30 @@ export function OnboardingScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: palette.background },
+  art: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    aspectRatio: IMG_RATIO,
+  },
+  bottomFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '20%',
+  },
   footer: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
     paddingHorizontal: spacing.xl,
-    gap: spacing.sm,
-  },
-  dots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.28)',
-  },
-  dotActive: {
-    width: 20,
-    backgroundColor: palette.amber,
+    gap: spacing.md,
   },
   primaryBtn: {
-    height: 56,
+    height: 58,
     borderRadius: radius.lg,
     flexDirection: 'row',
     alignItems: 'center',
@@ -132,11 +128,11 @@ const styles = StyleSheet.create({
   primaryText: { color: palette.white, fontWeight: '700', letterSpacing: 0.2 },
   arrow: { position: 'absolute', right: spacing.xl },
   secondaryBtn: {
-    height: 52,
+    height: 54,
     borderRadius: radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.16)',
   },

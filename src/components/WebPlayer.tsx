@@ -239,12 +239,12 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
     >
       {/* Media layer */}
       {ytId ? (
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          {box.h > 0 && (
+        <View style={styles.ytLayer} pointerEvents="none">
+          {box.w > 0 && (
             <YoutubePlayer
               ref={ytRef}
-              height={box.h}
               width={box.w}
+              height={Math.ceil(box.w * (9 / 16))}
               play={playing}
               mute={muted}
               videoId={ytId}
@@ -398,7 +398,13 @@ const styles = StyleSheet.create({
     borderColor: palette.glassBorder,
   },
   web: { ...StyleSheet.absoluteFillObject, backgroundColor: palette.black },
-  ytWeb: { backgroundColor: palette.black, opacity: 0.999 },
+  ytLayer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: palette.black,
+  },
+  ytWeb: { backgroundColor: palette.black },
   overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'space-between', padding: spacing.md },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   livePill: {

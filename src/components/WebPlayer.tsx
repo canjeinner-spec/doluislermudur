@@ -28,20 +28,12 @@ export type ControlEvent =
 type Source = { uri: string; headers?: Record<string, string> };
 
 /**
- * YouTube / Vimeo → clean embed players (just the video, no site chrome).
- * A youtube.com Referer avoids the "embed disabled" 153 error. Everything else
- * (incl. DRM providers) loads its real page so login / browse works in-place.
+ * Vimeo → clean embed. YouTube and everything else load their real page and are
+ * driven through the injected <video> controller. (The youtube.com/embed player
+ * is cleaner but returns error 150/152 for many videos, so we load the actual
+ * watch page, which reliably plays.)
  */
 function normalizeSource(raw: string): Source {
-  const yt = raw.match(
-    /(?:youtube\.com\/(?:watch\?[^#]*\bv=|embed\/|shorts\/|v\/)|youtu\.be\/)([\w-]{11})/
-  );
-  if (yt) {
-    return {
-      uri: `https://www.youtube.com/embed/${yt[1]}?autoplay=1&playsinline=1&controls=0&rel=0&modestbranding=1&fs=0&iv_load_policy=3`,
-      headers: { Referer: 'https://www.youtube.com/' },
-    };
-  }
   const vimeo = raw.match(/vimeo\.com\/(?:video\/)?(\d+)/);
   if (vimeo) return { uri: `https://player.vimeo.com/video/${vimeo[1]}?autoplay=1&playsinline=1` };
   return { uri: raw };

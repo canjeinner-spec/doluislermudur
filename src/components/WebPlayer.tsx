@@ -49,9 +49,15 @@ const CONTROLLER = `
     }
     return best || list[0] || null;
   }
+  var inited = false;
   function report() {
     var v = findVideo();
     if (!v) { post({ t: 'state', has: false }); return; }
+    if (!inited) {
+      inited = true;
+      // Autoplay policies start the video muted; bring the sound up once.
+      try { v.muted = false; v.volume = 1; v.play(); } catch (e) {}
+    }
     post({
       t: 'state', has: true,
       time: v.currentTime || 0,
@@ -82,8 +88,30 @@ const CONTROLLER = `
 })();
 `;
 
+/**
+ * Turn a provider watch URL into a clean, frame-filling embed player so only the
+ * video shows (no page chrome). Falls back to the original URL for providers
+ * without an embed form (e.g. DRM services that must load their full page).
+ */
+function toEmbedUrl(raw: string): string {
+  try {
+    const yt = raw.match(/(?:youtube\.com\/(?:watch\?[^#]*\bv=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
+    if (yt) {
+      return `https://www.youtube.com/embed/${yt[1]}?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=0`;
+    }
+    const vimeo = raw.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+    if (vimeo) {
+      return `https://player.vimeo.com/video/${vimeo[1]}?autoplay=1&playsinline=1`;
+    }
+  } catch {
+    /* fall through */
+  }
+  return raw;
+}
+
 export function WebPlayer({ uri, userAgent, onControl }: Props) {
   const webRef = useRef<WebView>(null);
+  const embedUri = React.useMemo(() => toEmbedUrl(uri), [uri]);
   const [playing, setPlaying] = useState(true);
   const [muted, setMuted] = useState(false);
   const [position, setPosition] = useState(0);
@@ -210,13 +238,13 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
     <View style={styles.container}>
       <WebView
         ref={webRef}
-        source={{ uri }}
+        source={{ uri: embedUri }}
         style={styles.web}
         injectedJavaScript={CONTROLLER}
         onMessage={onMessage}
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
-        allowsFullscreenVideo
+        allowsFullscreenVideo={false}
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         domStorageEnabled

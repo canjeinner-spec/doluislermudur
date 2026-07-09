@@ -44,17 +44,18 @@ function useRoom(params: Props['route']['params']): Room {
       { id: 'me', name: CURRENT_USER.name, handle: CURRENT_USER.handle, role: 'host', online: true, watching: true, tint: CURRENT_USER.tint },
       ...base.participants.slice(1, 4),
     ];
+    const title = params.title?.trim();
     return {
       id: 'new',
-      title: params.draft?.name ?? 'Yeni Oda',
-      subtitle: params.draft?.description || 'Az önce oluşturuldu',
+      title: title && title.length > 0 ? title : `${platform?.name ?? 'Netflix'} Odası`,
+      subtitle: 'Şimdi oynatılıyor',
       platform: platform?.id ?? 'netflix',
       platformLabel: platform?.name ?? 'Netflix',
       status: 'watching',
       isPublic: params.draft?.isPublic ?? true,
       hostName: CURRENT_USER.name,
       participantCount: participants.length,
-      maxParticipants: params.draft?.maxParticipants ?? 10,
+      maxParticipants: 10,
       posterIndex: base.posterIndex,
       participants,
     };

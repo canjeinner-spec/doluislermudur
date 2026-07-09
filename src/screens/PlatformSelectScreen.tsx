@@ -24,13 +24,10 @@ export function PlatformSelectScreen({ navigation, route }: Props) {
   const { draft } = route.params;
 
   const onSelect = (platformId: string) => {
-    const authed = storage.getJSON<string[]>(StorageKeys.authedPlatforms, []);
-    if (authed.includes(platformId)) {
-      // Already signed in on this provider — skip the login WebView entirely.
-      navigation.replace('Room', { draft, platformId: platformId as never });
-    } else {
-      navigation.navigate('WebViewLogin', { platformId: platformId as never, draft });
-    }
+    // Always open the provider so the user can start their content; the room
+    // opens once playback begins. If already signed in, cookies persist so no
+    // credentials are re-entered — the WebView lands straight on the catalog.
+    navigation.navigate('WebViewLogin', { platformId: platformId as never, draft });
   };
 
   return (
@@ -54,7 +51,8 @@ export function PlatformSelectScreen({ navigation, route }: Props) {
           Nerede izlemek{'\n'}istiyorsunuz?
         </Text>
         <Text style={[typography.subhead, styles.sub]}>
-          “{draft.name}” için bir platform seçin. Giriş her zaman platformun kendi sayfasında yapılır.
+          Bir platform seçin, içeriği başlatın; oda otomatik olarak açılır. Giriş her zaman
+          platformun kendi sayfasında yapılır.
         </Text>
 
         <View style={styles.list}>

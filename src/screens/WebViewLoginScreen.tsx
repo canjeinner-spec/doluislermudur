@@ -17,9 +17,21 @@ import type { RootStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WebViewLogin'>;
 
-/** Heuristics for "signed in" — the URL leaves the login/auth route. */
-const SUCCESS_HINTS = ['/browse', '/home', '/gallery', 'watch', 'account', 'profiles'];
-const LOGIN_HINTS = ['login', 'signin', 'sign-in', 'log_in', 'auth', 'ap/signin'];
+/** URL fragments that indicate content playback has started (→ open the room). */
+const PLAYBACK_HINTS = ['/watch', 'watch?', '/play', '/video/', '/viewer', '/stream'];
+
+/** Strip a provider suffix from the page title to name the room after content. */
+function cleanTitle(raw: string, providerName?: string): string {
+  let s = (raw || '').trim();
+  // Cut trailing " - Netflix", " | Prime Video", " • YouTube", etc.
+  s = s.replace(
+    /\s*[-|•·—]\s*(Netflix|YouTube|Prime\s*Video|Amazon.*|Disney\+?|Max|HBO[^-|]*|Apple\s*TV\+?|Vimeo|Google\s*Drive)[^-|•·—]*$/i,
+    ''
+  );
+  s = s.replace(/^(Watch|İzle)\s+/i, '');
+  if (providerName) s = s.replace(new RegExp(`\\s*[-|•·—]?\\s*${providerName}\\s*$`, 'i'), '');
+  return s.trim().slice(0, 42);
+}
 
 export function WebViewLoginScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
@@ -33,30 +45,35 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
   const [domain, setDomain] = useState(platform?.domain ?? '');
   const [secure, setSecure] = useState(true);
   const progress = useSharedValue(0);
+  const pageTitleRef = useRef('');
+  const finishedRef = useRef(false);
 
   const finish = () => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
     const authed = storage.getJSON<string[]>(StorageKeys.authedPlatforms, []);
     if (!authed.includes(platformId)) {
       storage.setJSON(StorageKeys.authedPlatforms, [...authed, platformId]);
     }
-    navigation.replace('Room', { draft, platformId });
+    const title = cleanTitle(pageTitleRef.current, platform?.name) || platform?.name || 'Oda';
+    navigation.replace('Room', { draft, platformId, title });
   };
 
   const onNavState = (nav: WebViewNavigation) => {
     setCanGoBack(nav.canGoBack);
     setCanGoForward(nav.canGoForward);
+    if (nav.title) pageTitleRef.current = nav.title;
     // Parse with a regex rather than `new URL` (Hermes' URL is incomplete).
     const match = /^(\w+):\/\/([^/?#]+)([^?#]*)(\?[^#]*)?/.exec(nav.url);
     if (!match) return;
     const [, scheme, host, pathname = '', search = ''] = match;
     setDomain(host.replace(/^www\./, ''));
     setSecure(scheme === 'https');
+    // Move to the room the moment real playback starts.
     const path = (pathname + search).toLowerCase();
-    const looksLoggedIn =
-      !nav.loading &&
-      SUCCESS_HINTS.some((h) => path.includes(h)) &&
-      !LOGIN_HINTS.some((h) => path.includes(h));
-    if (looksLoggedIn) finish();
+    if (!nav.loading && PLAYBACK_HINTS.some((h) => path.includes(h))) {
+      finish();
+    }
   };
 
   // Keep everything inside the WebView: allow web + about/data, block deep
@@ -101,8 +118,8 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
           </View>
         }
         right={
-          <PressableScale onPress={finish} accessibilityLabel="Girişi tamamla">
-            <Text style={[typography.bodyEmphasized, styles.done]}>Bitti</Text>
+          <PressableScale onPress={finish} accessibilityLabel="Odaya geç">
+            <Text style={[typography.bodyEmphasized, styles.done]}>Odaya Geç</Text>
           </PressableScale>
         }
       />
@@ -154,9 +171,10 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
       </View>
 
       <View style={styles.notice}>
-        <Icon name="lock" size={13} color={palette.textTertiary} strokeWidth={2} />
+        <Icon name="play" size={12} color={palette.amber} filled />
         <Text style={[typography.caption1, styles.noticeText]}>
-          Bu sayfa {platform?.name} tarafından sunulur. ASTERA şifreni görmez.
+          İçeriği başlat — oda otomatik açılır. Giriş {platform?.name} sayfasında yapılır, ASTERA
+          şifreni görmez.
         </Text>
       </View>
 

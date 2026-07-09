@@ -2,10 +2,7 @@ import type { PlatformId } from '@/components/icons';
 
 /** Draft assembled in Create Room, carried through platform + sign-in. */
 export interface RoomDraft {
-  name: string;
-  description: string;
   isPublic: boolean;
-  maxParticipants: number;
 }
 
 export type RootStackParamList = {
@@ -17,6 +14,8 @@ export type RootStackParamList = {
     roomId?: string;
     draft?: RoomDraft;
     platformId?: PlatformId;
+    /** Title captured from the provider page (the content being watched). */
+    title?: string;
   };
 };
 

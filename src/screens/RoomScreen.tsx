@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -21,7 +21,7 @@ import {
   VideoPlayer,
   WebPlayer,
 } from '@/components';
-import { CURRENT_USER, ROOMS, getPlatform, type Participant, type Room } from '@/data';
+import { CURRENT_USER, ROOMS, getPlatform, userAgentFor, type Participant, type Room } from '@/data';
 import { palette, spacing, typography } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 import { InviteFriendsSheet } from './sheets';
@@ -154,7 +154,10 @@ export function RoomScreen({ navigation, route }: Props) {
           decorative player for the sample rooms in the list. */}
       <View style={styles.playerWrap}>
         {route.params.contentUrl ? (
-          <WebPlayer uri={route.params.contentUrl} />
+          <WebPlayer
+            uri={route.params.contentUrl}
+            userAgent={userAgentFor(room.platform, Platform.OS)}
+          />
         ) : (
           <VideoPlayer posterIndex={room.posterIndex} />
         )}

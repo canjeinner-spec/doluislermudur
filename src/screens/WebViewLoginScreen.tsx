@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Icon, IconButton, NavBar, PressableScale, ScreenBackground } from '@/components';
-import { getPlatform } from '@/data';
+import { getPlatform, userAgentFor } from '@/data';
 import { palette, spacing, typography } from '@/theme';
 import { storage, StorageKeys } from '@/storage/storage';
 import type { RootStackParamList } from '@/navigation/types';
@@ -158,11 +158,7 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
             onShouldStartLoadWithRequest={onShouldStartLoad}
             setSupportMultipleWindows={false}
             javaScriptCanOpenWindowsAutomatically={false}
-            userAgent={
-              Platform.OS === 'ios'
-                ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
-                : 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36'
-            }
+            userAgent={userAgentFor(platformId, Platform.OS)}
           />
         )}
         {loading && (

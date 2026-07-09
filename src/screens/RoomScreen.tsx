@@ -45,9 +45,9 @@ function useRoom(params: Props['route']['params']): Room {
     }
     const platform = getPlatform(params.platformId ?? 'netflix');
     const base = ROOMS[0];
+    // A freshly created room only has you in it.
     const participants: Participant[] = [
       { id: 'me', name: CURRENT_USER.name, handle: CURRENT_USER.handle, role: 'host', online: true, watching: true, tint: CURRENT_USER.tint },
-      ...base.participants.slice(1, 4),
     ];
     const title = params.title?.trim();
     return {

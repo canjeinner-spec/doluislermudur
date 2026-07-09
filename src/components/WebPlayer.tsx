@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { LayoutChangeEvent, Platform, StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -318,17 +318,14 @@ export function WebPlayer({ uri, userAgent, fill, onToggleFullscreen, fullscreen
         />
       )}
 
-      {/* Tap anywhere on the YouTube video to toggle the controls. */}
+      {/* Tap the video to toggle controls. Plain RN Pressable so it doesn't
+          fight the Gesture-Handler control buttons layered above it. */}
       {ytId && (
-        <PressableScale
+        <Pressable
           onPress={toggleControls}
-          activeScale={1}
-          activeOpacity={1}
           style={StyleSheet.absoluteFill}
           accessibilityLabel="Kontroller"
-        >
-          <View style={StyleSheet.absoluteFill} />
-        </PressableScale>
+        />
       )}
 
       {/* Controls float over the video (auto-hide on YouTube) */}

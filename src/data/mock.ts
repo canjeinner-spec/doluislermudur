@@ -55,8 +55,8 @@ export const ROOMS: Room[] = [
     id: 'r2',
     title: 'The Dark Knight',
     subtitle: 'Christopher Nolan',
-    platform: 'max',
-    platformLabel: 'Max',
+    platform: 'youtube',
+    platformLabel: 'YouTube',
     status: 'waiting',
     isPublic: true,
     hostName: 'Zeynep',
@@ -83,8 +83,8 @@ export const ROOMS: Room[] = [
     id: 'r4',
     title: 'Inception',
     subtitle: 'Christopher Nolan',
-    platform: 'disney',
-    platformLabel: 'Disney+',
+    platform: 'gdrive',
+    platformLabel: 'Google Drive',
     status: 'waiting',
     isPublic: true,
     hostName: 'Deniz',
@@ -97,8 +97,8 @@ export const ROOMS: Room[] = [
     id: 'r5',
     title: 'Dune: Part Two',
     subtitle: 'Denis Villeneuve',
-    platform: 'appletv',
-    platformLabel: 'Apple TV+',
+    platform: 'netflix',
+    platformLabel: 'Netflix',
     status: 'watching',
     isPublic: true,
     hostName: 'Selin',
@@ -123,49 +123,8 @@ export const ROOMS: Room[] = [
   },
 ];
 
-export const CHAT_SEED: ChatMessage[] = [
-  {
-    id: 'm1',
-    authorId: 'p3',
-    authorName: 'Emir',
-    tint: tints[3],
-    text: 'Efsane bir sahne ya 🔥',
-    time: '21:42',
-  },
-  {
-    id: 'm2',
-    authorId: 'p1',
-    authorName: 'Zeynep',
-    tint: tints[1],
-    text: 'Gerçekten tüyler ürpertici!',
-    time: '21:43',
-  },
-  {
-    id: 'm3',
-    authorId: 'p2',
-    authorName: 'Ali',
-    tint: tints[2],
-    text: 'Müzik de çok iyi gidiyor',
-    time: '21:43',
-  },
-  {
-    id: 'm4',
-    authorId: 'me',
-    authorName: 'Sen',
-    tint: palette.copper,
-    text: 'Bu sahneyi her izleyişimde aynı etkiyi yaşıyorum 🍿',
-    time: '21:44',
-    mine: true,
-  },
-  {
-    id: 'm5',
-    authorId: 'p4',
-    authorName: 'Deniz',
-    tint: tints[4],
-    text: 'Ses birazcık kısılabilir mi acaba',
-    time: '21:45',
-  },
-];
+/** Chat starts empty — real messages are added as participants type. */
+export const CHAT_SEED: ChatMessage[] = [];
 
 export const CURRENT_USER = {
   id: 'me',

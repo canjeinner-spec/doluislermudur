@@ -80,10 +80,46 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
   const [scrubbing, setScrubbing] = useState(false);
   const [trackWidth, setTrackWidth] = useState(0);
   const [box, setBox] = useState({ w: 0, h: 0 });
+  const [controlsVisible, setControlsVisible] = useState(true);
 
   const progress = useSharedValue(0);
   const trackW = useSharedValue(0);
   const knobScale = useSharedValue(1);
+  const controlsOpacity = useSharedValue(1);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showControls = useCallback(() => {
+    setControlsVisible(true);
+    controlsOpacity.value = withTiming(1, { duration: 150 });
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    // Only the (non-interactive) YouTube player auto-hides; WebView pages keep
+    // controls up so the site underneath stays reachable.
+    if (ytId) {
+      hideTimer.current = setTimeout(() => {
+        controlsOpacity.value = withTiming(0, { duration: 350 }, (f) => {
+          if (f) runOnJS(setControlsVisible)(false);
+        });
+      }, 3200);
+    }
+  }, [controlsOpacity, ytId]);
+
+  const toggleControls = useCallback(() => {
+    if (controlsVisible) {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      controlsOpacity.value = withTiming(0, { duration: 220 }, (f) => {
+        if (f) runOnJS(setControlsVisible)(false);
+      });
+    } else {
+      showControls();
+    }
+  }, [controlsVisible, controlsOpacity, showControls]);
+
+  useEffect(() => {
+    showControls();
+    return () => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+    };
+  }, [showControls]);
 
   // ── Command dispatch ────────────────────────────────────────────────
   const applyWeb = useCallback((cmd: object) => {
@@ -95,6 +131,7 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
     setPlaying(next);
     if (!ytId) applyWeb({ type: next ? 'play' : 'pause' });
     onControl?.(next ? { type: 'play' } : { type: 'pause' });
+    showControls();
   };
 
   const seekBy = (delta: number) => {
@@ -102,12 +139,15 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
     if (ytId) ytRef.current?.seekTo(next, true);
     else applyWeb({ type: 'seekBy', delta });
     setPosition(next);
+    showControls();
   };
 
   const toggleMute = () => {
     const next = !muted;
     setMuted(next);
+    didUnmute.current = true;
     if (!ytId) applyWeb({ type: 'mute', value: next });
+    showControls();
   };
 
   // ── YouTube state polling ───────────────────────────────────────────
@@ -190,6 +230,7 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
   const knobStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: progress.value * trackW.value }, { scale: knobScale.value }],
   }));
+  const overlayStyle = useAnimatedStyle(() => ({ opacity: controlsOpacity.value }));
 
   return (
     <View
@@ -216,6 +257,9 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
                   /* ignore */
                 }
                 setHasVideo(true);
+                // Nudge playback — the `play` prop alone often won't autostart on
+                // mobile; a seek kicks it off (muted, so the browser allows it).
+                setTimeout(() => ytRef.current?.seekTo(0, true), 250);
               }}
               onChangeState={(s: string) => {
                 if (s === 'playing') {
@@ -260,8 +304,21 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
         />
       )}
 
-      {/* Controls float over the video */}
-      <View style={styles.overlay} pointerEvents="box-none">
+      {/* Tap anywhere on the YouTube video to toggle the controls. */}
+      {ytId && (
+        <PressableScale
+          onPress={toggleControls}
+          activeScale={1}
+          activeOpacity={1}
+          style={StyleSheet.absoluteFill}
+          accessibilityLabel="Kontroller"
+        >
+          <View style={StyleSheet.absoluteFill} />
+        </PressableScale>
+      )}
+
+      {/* Controls float over the video (auto-hide on YouTube) */}
+      <Animated.View style={[styles.overlay, overlayStyle]} pointerEvents={controlsVisible ? 'box-none' : 'none'}>
         <View style={styles.topRow} pointerEvents="box-none">
           <View style={styles.livePill}>
             <View style={styles.liveDot} />
@@ -295,7 +352,7 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
             </View>
           </GestureDetector>
         </View>
-      </View>
+      </Animated.View>
     </View>
   );
 }

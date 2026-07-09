@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import {
 import { palette } from '@/theme';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RootNavigator } from '@/navigation/RootNavigator';
+import { ensureSession, isBackendConfigured } from '@/backend';
 
 const asteraTheme: Theme = {
   ...DarkTheme,
@@ -26,6 +27,13 @@ const asteraTheme: Theme = {
 };
 
 export default function App() {
+  // Establish a backend identity once, when configured. No-ops on mock data.
+  useEffect(() => {
+    if (isBackendConfigured) {
+      ensureSession().catch((e) => console.warn('[astera] backend init failed:', e));
+    }
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

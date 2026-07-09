@@ -113,7 +113,6 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [hasVideo, setHasVideo] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(true);
   const [scrubbing, setScrubbing] = useState(false);
   const [trackWidth, setTrackWidth] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -121,8 +120,6 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
   const progress = useSharedValue(0);
   const trackW = useSharedValue(0);
   const knobScale = useSharedValue(1);
-  const controlsOpacity = useSharedValue(1);
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const apply = useCallback(
     (cmd: object) => {
@@ -131,24 +128,6 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
     },
     [ytId]
   );
-
-  const revealControls = useCallback(() => {
-    setControlsVisible(true);
-    controlsOpacity.value = withTiming(1, { duration: 160 });
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => {
-      controlsOpacity.value = withTiming(0, { duration: 400 }, (f) => {
-        if (f) runOnJS(setControlsVisible)(false);
-      });
-    }, 4200);
-  }, [controlsOpacity]);
-
-  useEffect(() => {
-    revealControls();
-    return () => {
-      if (hideTimer.current) clearTimeout(hideTimer.current);
-    };
-  }, [revealControls]);
 
   useEffect(() => {
     if (!scrubbing) progress.value = duration > 0 ? position / duration : 0;
@@ -184,20 +163,17 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
     setPlaying(next);
     apply({ type: next ? 'play' : 'pause' });
     onControl?.(next ? { type: 'play' } : { type: 'pause' });
-    revealControls();
   };
 
   const seekBy = (delta: number) => {
     apply({ type: 'seekBy', delta });
     setPosition((p) => Math.max(0, Math.min(duration || Infinity, p + delta)));
-    revealControls();
   };
 
   const toggleMute = () => {
     const next = !muted;
     setMuted(next);
     apply({ type: 'mute', value: next });
-    revealControls();
   };
 
   const onTrackLayout = (e: LayoutChangeEvent) => {
@@ -234,14 +210,12 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
       knobScale.value = withTiming(1, { duration: 160 });
       if (trackWidth > 0) runOnJS(commitSeek)(Math.min(1, Math.max(0, e.x / trackWidth)));
       runOnJS(setScrubbing)(false);
-      runOnJS(revealControls)();
     });
 
   const fillStyle = useAnimatedStyle(() => ({ width: progress.value * trackW.value }));
   const knobStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: progress.value * trackW.value }, { scale: knobScale.value }],
   }));
-  const overlayStyle = useAnimatedStyle(() => ({ opacity: controlsOpacity.value }));
 
   return (
     <View style={styles.container}>
@@ -267,16 +241,6 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
         allowsBackForwardNavigationGestures={false}
       />
 
-      <PressableScale
-        onPress={revealControls}
-        activeScale={1}
-        activeOpacity={1}
-        style={styles.tapCatcher}
-        accessibilityLabel="Kontroller"
-      >
-        <View />
-      </PressableScale>
-
       {error && (
         <View style={styles.errorWrap} pointerEvents="none">
           <Icon name="info" size={22} color={palette.textSecondary} />
@@ -284,10 +248,9 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
         </View>
       )}
 
-      <Animated.View
-        style={[styles.overlay, overlayStyle]}
-        pointerEvents={controlsVisible ? 'box-none' : 'none'}
-      >
+      {/* Controls float over the video; box-none lets touches reach the WebView
+          in the gaps so provider pages (login, etc.) stay interactive. */}
+      <View style={styles.overlay} pointerEvents="box-none">
         <View style={styles.topRow} pointerEvents="box-none">
           <View style={styles.livePill}>
             <View style={styles.liveDot} />
@@ -321,7 +284,7 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
             </View>
           </GestureDetector>
         </View>
-      </Animated.View>
+      </View>
     </View>
   );
 }
@@ -367,7 +330,6 @@ const styles = StyleSheet.create({
     borderColor: palette.glassBorder,
   },
   web: { ...StyleSheet.absoluteFillObject, backgroundColor: palette.black },
-  tapCatcher: { position: 'absolute', left: 0, right: 0, top: 40, bottom: 64 },
   errorWrap: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',

@@ -10,10 +10,10 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import {
   BottomSheet,
-  GradientButton,
   Icon,
   IconButton,
   NavBar,
+  PressableScale,
   RoomCard,
   ScreenBackground,
   Sidebar,
@@ -21,7 +21,7 @@ import {
 } from '@/components';
 import type { SidebarDestination } from '@/components';
 import { ROOMS } from '@/data';
-import { palette, spacing, typography } from '@/theme';
+import { accentGradient, palette, shadow, spacing, typography } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 import {
   AboutSheet,
@@ -99,6 +99,8 @@ export function HomeScreen({ navigation }: Props) {
         left={
           <IconButton
             icon="menu"
+            iconSize={24}
+            variant="plain"
             accessibilityLabel="Menüyü aç"
             onPress={() => setSidebarOpen(true)}
           />
@@ -113,9 +115,10 @@ export function HomeScreen({ navigation }: Props) {
         }
         right={
           <IconButton
-            icon="bell"
-            accessibilityLabel="Bildirimler"
-            badge={3}
+            icon="users"
+            iconSize={24}
+            variant="plain"
+            accessibilityLabel="Arkadaşlar"
             onPress={() => setSheet('invite')}
           />
         }
@@ -180,18 +183,23 @@ export function HomeScreen({ navigation }: Props) {
         }
       />
 
-      {/* Floating create button with a fade so cards scroll cleanly beneath it. */}
-      <View style={[styles.fabWrap, { paddingBottom: insets.bottom + spacing.md }]} pointerEvents="box-none">
-        <LinearGradient
-          colors={['rgba(9,9,9,0)', 'rgba(9,9,9,0.85)', palette.background]}
-          style={styles.fabFade}
-          pointerEvents="none"
-        />
-        <GradientButton
-          label="Oda Oluştur"
-          icon="plus"
+      {/* Round create FAB, bottom-right (Rave-style). */}
+      <View style={[styles.fabWrap, { paddingBottom: insets.bottom + spacing.lg }]} pointerEvents="box-none">
+        <PressableScale
           onPress={() => navigation.navigate('CreateRoom')}
-        />
+          activeScale={0.9}
+          accessibilityLabel="Oda oluştur"
+          style={[styles.fab, shadow.accentGlow]}
+        >
+          <LinearGradient
+            colors={accentGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.fabGradient}
+          >
+            <Icon name="plus" size={30} color={palette.white} strokeWidth={2.4} />
+          </LinearGradient>
+        </PressableScale>
       </View>
 
       <Sidebar
@@ -284,17 +292,18 @@ const styles = StyleSheet.create({
   },
   fabWrap: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    right: spacing.lg,
     bottom: 0,
-    paddingHorizontal: spacing.lg,
-    justifyContent: 'flex-end',
   },
-  fabFade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 140,
+  fab: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  fabGradient: {
+    flex: 1,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

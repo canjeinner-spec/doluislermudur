@@ -87,9 +87,9 @@ function renderGlyph(
     case 'menu':
       return (
         <>
-          <Line x1="3.5" y1="7" x2="20.5" y2="7" {...stroke} />
+          <Line x1="3.5" y1="6.5" x2="20.5" y2="6.5" {...stroke} />
           <Line x1="3.5" y1="12" x2="20.5" y2="12" {...stroke} />
-          <Line x1="3.5" y1="17" x2="14" y2="17" {...stroke} />
+          <Line x1="3.5" y1="17.5" x2="20.5" y2="17.5" {...stroke} />
         </>
       );
     case 'grid':

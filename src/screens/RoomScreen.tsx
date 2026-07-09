@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
+import { BlurView } from 'expo-blur';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -129,12 +130,22 @@ export function RoomScreen({ navigation, route }: Props) {
       {usersOpen && (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
           <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, scrimStyle]} onTouchEnd={closeUsers} />
-          <Animated.View style={[styles.usersPanel, { paddingTop: insets.top + spacing.sm }, usersStyle]}>
-            <View style={styles.usersHeader}>
-              <Text style={[typography.title3, styles.usersTitle]}>Kullanıcılar</Text>
-              <IconButton icon="close" size={32} iconSize={16} variant="solid" accessibilityLabel="Kapat" onPress={closeUsers} />
+          <Animated.View style={[styles.usersPanel, usersStyle]}>
+            <BlurView intensity={Platform.OS === 'ios' ? 40 : 60} tint="dark" style={StyleSheet.absoluteFill} />
+            <View style={[StyleSheet.absoluteFill, styles.usersFill]} />
+            <View style={{ paddingTop: insets.top + spacing.sm, flex: 1 }}>
+              <View style={styles.usersGrabberRow}>
+                <View style={styles.usersGrabber} />
+              </View>
+              <View style={styles.usersHeader}>
+                <View>
+                  <Text style={[typography.title3, styles.usersTitle]}>Kullanıcılar</Text>
+                  <Text style={[typography.footnote, styles.usersSub]}>{room.participantCount} katılımcı</Text>
+                </View>
+                <IconButton icon="close" size={32} iconSize={16} variant="solid" accessibilityLabel="Kapat" onPress={closeUsers} />
+              </View>
+              <UsersPanel participants={room.participants} bottomInset={insets.bottom} onInvite={() => { closeUsers(); setTimeout(() => setInviteOpen(true), 260); }} />
             </View>
-            <UsersPanel participants={room.participants} bottomInset={insets.bottom} onInvite={() => { closeUsers(); setTimeout(() => setInviteOpen(true), 260); }} />
           </Animated.View>
         </View>
       )}
@@ -181,25 +192,42 @@ const styles = StyleSheet.create({
   subRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   sub: { color: palette.textSecondary },
   playerWrap: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
-  scrim: { backgroundColor: 'rgba(0,0,0,0.5)' },
+  scrim: { backgroundColor: 'rgba(0,0,0,0.55)' },
   usersPanel: {
     position: 'absolute',
     top: 0,
     right: 0,
     bottom: 0,
-    width: '86%',
-    backgroundColor: palette.surface,
+    width: '82%',
+    maxWidth: 360,
+    borderTopLeftRadius: 28,
+    borderBottomLeftRadius: 28,
+    overflow: 'hidden',
     borderLeftWidth: StyleSheet.hairlineWidth,
     borderLeftColor: palette.separatorStrong,
+    shadowColor: '#000',
+    shadowOffset: { width: -8, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+    elevation: 20,
+  },
+  usersFill: { backgroundColor: 'rgba(18,17,16,0.82)' },
+  usersGrabberRow: { alignItems: 'center', paddingBottom: spacing.md },
+  usersGrabber: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: palette.textQuaternary,
   },
   usersHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.xl,
     paddingBottom: spacing.md,
   },
   usersTitle: { color: palette.textPrimary },
+  usersSub: { color: palette.textTertiary, marginTop: 1 },
   actions: { gap: spacing.sm, paddingTop: spacing.xs },
   countBtn: {
     flexDirection: 'row',

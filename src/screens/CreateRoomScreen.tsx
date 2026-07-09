@@ -33,11 +33,10 @@ export function CreateRoomScreen({ navigation }: Props) {
   return (
     <ScreenBackground glow="top">
       <NavBar
-        compact
         left={
           <IconButton
             icon="chevron-left"
-            accessibilityLabel="Kapat"
+            accessibilityLabel="Geri"
             variant="solid"
             onPress={() => navigation.goBack()}
           />

@@ -17,44 +17,43 @@ const ROLE_LABEL: Record<Participant['role'], string> = {
   member: 'Üye',
 };
 
-/** Slide-over roster: host, co-hosts and members with watching/online state. */
+/** Slide-over roster: host and members grouped into clean cards. */
 export function UsersPanel({ participants, bottomInset, onInvite }: Props) {
   const host = participants.find((p) => p.role === 'host');
   const others = participants.filter((p) => p.role !== 'host');
-  const onlineCount = participants.filter((p) => p.online).length;
 
   return (
     <View style={styles.root}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.summary}>
-          <Text style={[typography.footnote, styles.summaryText]}>
-            {participants.length} katılımcı · {onlineCount} çevrimiçi
-          </Text>
-        </View>
-
         {host && (
           <>
-            <Text style={[typography.sectionHeader, styles.sectionLabel]}>Sunucu</Text>
-            <UserRow participant={host} />
+            <Text style={styles.section}>SUNUCU</Text>
+            <View style={styles.card}>
+              <UserRow participant={host} />
+            </View>
           </>
         )}
 
-        <Text style={[typography.sectionHeader, styles.sectionLabel]}>Katılımcılar</Text>
-        <View style={styles.group}>
-          {others.map((p) => (
-            <UserRow key={p.id} participant={p} />
+        <Text style={styles.section}>KATILIMCILAR</Text>
+        <View style={styles.card}>
+          {others.map((p, i) => (
+            <View key={p.id}>
+              {i > 0 && <View style={styles.divider} />}
+              <UserRow participant={p} />
+            </View>
           ))}
         </View>
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: bottomInset + spacing.sm }]}>
-        <GradientButton label="Katılımcı Davet Et" icon="person-add" onPress={onInvite} />
+        <GradientButton label="Davet Et" icon="person-add" onPress={onInvite} />
       </View>
     </View>
   );
 }
 
 function UserRow({ participant }: { participant: Participant }) {
+  const isMember = participant.role === 'member';
   return (
     <View style={styles.row}>
       <Avatar name={participant.name} tint={participant.tint} size={40} online={participant.online} />
@@ -63,7 +62,7 @@ function UserRow({ participant }: { participant: Participant }) {
           <Text style={[typography.subheadEmphasized, styles.name]} numberOfLines={1}>
             {participant.name}
           </Text>
-          {participant.role !== 'member' && (
+          {!isMember && (
             <Icon
               name="crown"
               size={13}
@@ -77,14 +76,14 @@ function UserRow({ participant }: { participant: Participant }) {
       <View style={[styles.status, participant.watching ? styles.watching : styles.idle]}>
         <Icon
           name={participant.watching ? 'eye' : 'pause'}
-          size={12}
+          size={11}
           color={participant.watching ? palette.online : palette.textTertiary}
           strokeWidth={2}
         />
         <Text
           style={[
             typography.caption2,
-            { color: participant.watching ? palette.online : palette.textTertiary, fontWeight: '600' },
+            { color: participant.watching ? palette.online : palette.textTertiary, fontWeight: '700' },
           ]}
         >
           {participant.watching ? 'İzliyor' : 'Beklemede'}
@@ -95,50 +94,36 @@ function UserRow({ participant }: { participant: Participant }) {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
-  },
-  summary: {
-    marginBottom: spacing.lg,
-  },
-  summaryText: {
-    color: palette.textSecondary,
-  },
-  sectionLabel: {
+  root: { flex: 1 },
+  content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.md },
+  section: {
+    ...typography.caption2,
     color: palette.textTertiary,
+    fontWeight: '700',
+    letterSpacing: 0.6,
     marginBottom: spacing.sm,
-    marginTop: spacing.md,
+    marginTop: spacing.lg,
+    marginLeft: spacing.xs,
   },
-  group: {
-    gap: spacing.xs,
+  card: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.glassBorder,
+    overflow: 'hidden',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
-  text: {
-    flex: 1,
-    gap: 1,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  name: {
-    color: palette.textPrimary,
-    flexShrink: 1,
-  },
-  role: {
-    color: palette.textTertiary,
-  },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.separator, marginLeft: 64 },
+  text: { flex: 1, gap: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  name: { color: palette.textPrimary, flexShrink: 1 },
+  role: { color: palette.textTertiary },
   status: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -147,12 +132,8 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
   },
-  watching: {
-    backgroundColor: 'rgba(78,208,138,0.12)',
-  },
-  idle: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
+  watching: { backgroundColor: 'rgba(78,208,138,0.13)' },
+  idle: { backgroundColor: 'rgba(255,255,255,0.06)' },
   footer: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,

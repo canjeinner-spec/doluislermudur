@@ -1,5 +1,4 @@
 import React from 'react';
-import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { palette } from '@/theme';
@@ -18,8 +17,6 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
  * create-room flow (form sheet on iOS, full-screen elsewhere).
  */
 export function RootNavigator() {
-  const sheetPresentation = Platform.OS === 'ios' ? 'formSheet' : 'modal';
-
   return (
     <Stack.Navigator
       screenOptions={{
@@ -31,17 +28,7 @@ export function RootNavigator() {
       }}
     >
       <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen
-        name="CreateRoom"
-        component={CreateRoomScreen}
-        options={{
-          presentation: sheetPresentation,
-          animation: 'slide_from_bottom',
-          sheetGrabberVisible: true,
-          sheetCornerRadius: 28,
-          sheetAllowedDetents: [0.92],
-        }}
-      />
+      <Stack.Screen name="CreateRoom" component={CreateRoomScreen} />
       <Stack.Screen name="PlatformSelect" component={PlatformSelectScreen} />
       <Stack.Screen name="WebViewLogin" component={WebViewLoginScreen} />
       <Stack.Screen

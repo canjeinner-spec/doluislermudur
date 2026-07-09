@@ -105,14 +105,7 @@ export function HomeScreen({ navigation }: Props) {
             onPress={() => setSidebarOpen(true)}
           />
         }
-        titleNode={
-          <View style={styles.wordmark}>
-            <View style={styles.logoDot}>
-              <Icon name="film" size={15} color={palette.amberBright} />
-            </View>
-            <Text style={styles.brand}>ASTERA</Text>
-          </View>
-        }
+        titleNode={<Text style={styles.brand}>ASTERA</Text>}
         right={
           <IconButton
             icon="users"

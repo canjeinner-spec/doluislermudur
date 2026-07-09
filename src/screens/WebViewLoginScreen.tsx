@@ -39,7 +39,10 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
   const platform = getPlatform(platformId);
   const webRef = useRef<WebView>(null);
 
-  const [loading, setLoading] = useState(true);
+  // Blocking spinner only for the very first page — SPA sites (Netflix, YouTube)
+  // fire onLoadStart on every internal navigation, which would otherwise re-show
+  // it and feel stuck.
+  const [initialLoading, setInitialLoading] = useState(true);
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
   const [domain, setDomain] = useState(platform?.domain ?? '');
@@ -145,14 +148,14 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
             style={styles.web}
             onNavigationStateChange={onNavState}
             onLoadStart={() => {
-              setLoading(true);
               progress.value = withTiming(0.15, { duration: 120 });
             }}
             onLoadProgress={({ nativeEvent }) => {
               progress.value = withTiming(nativeEvent.progress, { duration: 120 });
+              if (nativeEvent.progress > 0.7) setInitialLoading(false);
             }}
             onLoadEnd={() => {
-              setLoading(false);
+              setInitialLoading(false);
               progress.value = withTiming(1, { duration: 160 });
             }}
             startInLoadingState
@@ -167,7 +170,7 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
             userAgent={userAgentFor(platformId, Platform.OS)}
           />
         )}
-        {loading && (
+        {initialLoading && (
           <View style={styles.loader} pointerEvents="none">
             <ActivityIndicator color={palette.amber} />
           </View>

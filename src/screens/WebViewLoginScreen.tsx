@@ -157,7 +157,6 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
             }}
             startInLoadingState
             renderLoading={() => <View />}
-            decelerationRate="normal"
             allowsBackForwardNavigationGestures
             sharedCookiesEnabled
             thirdPartyCookiesEnabled

@@ -148,9 +148,12 @@ export function RoomScreen({ navigation, route }: Props) {
         </View>
       </View>
 
-      {/* Player */}
+      {/* Player — temporarily replaced with a placeholder to isolate a crash. */}
       <View style={styles.playerWrap}>
-        <VideoPlayer posterIndex={room.posterIndex} />
+        <View style={styles.playerPlaceholder}>
+          <Icon name="play" size={34} color={palette.textTertiary} filled />
+          <Text style={[typography.footnote, { color: palette.textTertiary }]}>Oynatıcı (geçici kapalı)</Text>
+        </View>
       </View>
 
       {/* Tabs */}
@@ -283,6 +286,16 @@ const styles = StyleSheet.create({
   },
   playerWrap: {
     paddingHorizontal: spacing.lg,
+  },
+  playerPlaceholder: {
+    aspectRatio: 16 / 9,
+    borderRadius: 18,
+    backgroundColor: palette.surfaceSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.glassBorder,
   },
   tabsWrap: {
     paddingHorizontal: spacing.lg,

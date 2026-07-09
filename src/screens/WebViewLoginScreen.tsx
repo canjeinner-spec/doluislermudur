@@ -45,19 +45,31 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
   const onNavState = (nav: WebViewNavigation) => {
     setCanGoBack(nav.canGoBack);
     setCanGoForward(nav.canGoForward);
-    try {
-      const url = new URL(nav.url);
-      setDomain(url.hostname.replace(/^www\./, ''));
-      setSecure(url.protocol === 'https:');
-      const path = (url.pathname + url.search).toLowerCase();
-      const looksLoggedIn =
-        !nav.loading &&
-        SUCCESS_HINTS.some((h) => path.includes(h)) &&
-        !LOGIN_HINTS.some((h) => path.includes(h));
-      if (looksLoggedIn) finish();
-    } catch {
-      /* non-URL navigation, ignore */
-    }
+    // Parse with a regex rather than `new URL` (Hermes' URL is incomplete).
+    const match = /^(\w+):\/\/([^/?#]+)([^?#]*)(\?[^#]*)?/.exec(nav.url);
+    if (!match) return;
+    const [, scheme, host, pathname = '', search = ''] = match;
+    setDomain(host.replace(/^www\./, ''));
+    setSecure(scheme === 'https');
+    const path = (pathname + search).toLowerCase();
+    const looksLoggedIn =
+      !nav.loading &&
+      SUCCESS_HINTS.some((h) => path.includes(h)) &&
+      !LOGIN_HINTS.some((h) => path.includes(h));
+    if (looksLoggedIn) finish();
+  };
+
+  // Keep everything inside the WebView: allow web + about/data, block deep
+  // links (nflx://, netflix://, itms-apps://) that would trigger an iOS
+  // "Open in app?" prompt and bounce the user out of the login flow.
+  const onShouldStartLoad = (request: { url: string }): boolean => {
+    const url = request.url;
+    return (
+      url.startsWith('http://') ||
+      url.startsWith('https://') ||
+      url.startsWith('about:') ||
+      url.startsWith('data:')
+    );
   };
 
   // scaleX from the left edge — numeric transform, no string-percentage layout.
@@ -123,10 +135,14 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
             allowsBackForwardNavigationGestures
             sharedCookiesEnabled
             thirdPartyCookiesEnabled
+            originWhitelist={['http://*', 'https://*', 'about:*', 'data:*']}
+            onShouldStartLoadWithRequest={onShouldStartLoad}
+            setSupportMultipleWindows={false}
+            javaScriptCanOpenWindowsAutomatically={false}
             userAgent={
               Platform.OS === 'ios'
                 ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
-                : undefined
+                : 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36'
             }
           />
         )}

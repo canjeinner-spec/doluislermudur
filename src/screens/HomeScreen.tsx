@@ -21,6 +21,7 @@ import {
 } from '@/components';
 import type { SidebarDestination } from '@/components';
 import { ROOMS } from '@/data';
+import { isBackendConfigured, useRooms } from '@/backend';
 import { accentGradient, palette, shadow, spacing, typography } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 import {
@@ -51,18 +52,21 @@ export function HomeScreen({ navigation }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sheet, setSheet] = useState<SheetKey | null>(null);
 
+  const { rooms: liveRooms } = useRooms();
+  const source = isBackendConfigured ? liveRooms : ROOMS;
+
   const rooms = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return ROOMS;
-    return ROOMS.filter(
+    if (!q) return source;
+    return source.filter(
       (r) =>
         r.title.toLowerCase().includes(q) ||
         r.subtitle.toLowerCase().includes(q) ||
         r.platformLabel.toLowerCase().includes(q)
     );
-  }, [query]);
+  }, [query, source]);
 
-  const activeCount = ROOMS.filter((r) => r.status === 'watching').length;
+  const activeCount = source.filter((r) => r.status === 'watching').length;
 
   const handleSidebarSelect = (dest: SidebarDestination) => {
     setSidebarOpen(false);
@@ -168,9 +172,9 @@ export function HomeScreen({ navigation }: Props) {
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Icon name="search" size={30} color={palette.textTertiary} />
+            <Icon name={query ? 'search' : 'rooms'} size={30} color={palette.textTertiary} />
             <Text style={[typography.body, styles.emptyText]}>
-              “{query}” için oda bulunamadı
+              {query ? `“${query}” için oda bulunamadı` : 'Henüz açık oda yok — ilk odayı sen kur!'}
             </Text>
           </View>
         }

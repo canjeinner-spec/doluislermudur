@@ -68,13 +68,20 @@ export function RoomCard({ room, onPress, onLongPress }: Props) {
           {room.title}
         </Text>
         <View style={styles.metaRow}>
-          <AvatarStack
-            participants={room.participants}
-            max={5}
-            size={22}
-            overflowCount={Math.max(0, room.participantCount - 5)}
-            ringColor={palette.surface}
-          />
+          {room.participants.length > 0 ? (
+            <AvatarStack
+              participants={room.participants}
+              max={5}
+              size={22}
+              overflowCount={Math.max(0, room.participantCount - 5)}
+              ringColor={palette.surface}
+            />
+          ) : (
+            <View style={styles.countChip}>
+              <Icon name="users" size={13} color={palette.textSecondary} />
+              <Text style={[typography.caption1, styles.countChipText]}>{room.participantCount}</Text>
+            </View>
+          )}
           {!room.isPublic && (
             <Icon name="lock" size={12} color={palette.textTertiary} strokeWidth={2.2} />
           )}
@@ -141,5 +148,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  countChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: spacing.sm,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: palette.glass,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.glassBorder,
+  },
+  countChipText: {
+    color: palette.textSecondary,
+    fontWeight: '700',
   },
 });

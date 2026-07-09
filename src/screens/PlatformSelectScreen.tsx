@@ -31,6 +31,7 @@ export function PlatformSelectScreen({ navigation, route }: Props) {
       platformId: platformId as never,
       draft,
       returnToRoom: route.params.returnToRoom,
+      roomId: route.params.roomId,
     });
   };
 

@@ -28,6 +28,7 @@ import {
   type Participant,
   type Room,
 } from '@/data';
+import { isBackendConfigured, useRoomSession } from '@/backend';
 import { palette, radius, spacing, typography } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 import { InviteFriendsSheet } from './sheets';
@@ -69,8 +70,16 @@ function useRoom(params: Props['route']['params']): Room {
 
 export function RoomScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
-  const room = useRoom(route.params);
-  const contentUrl = route.params.contentUrl;
+
+  // Backend room (live roster + join/leave) when configured; otherwise the
+  // locally-synthesised room from the create flow.
+  const backendRoomId = isBackendConfigured ? route.params.roomId : undefined;
+  const session = useRoomSession(backendRoomId);
+  const localRoom = useRoom(route.params);
+  const room = session.room ?? localRoom;
+  const contentUrl = session.room ? session.contentUrl : route.params.contentUrl;
+  const participants = session.room ? session.participants : room.participants;
+
   const [inviteOpen, setInviteOpen] = useState(false);
   const [usersOpen, setUsersOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -109,8 +118,14 @@ export function RoomScreen({ navigation, route }: Props) {
     };
   }, []);
 
+  const count = session.room ? participants.length : room.participantCount;
+
   const changeContent = () =>
-    navigation.navigate('PlatformSelect', { draft: { isPublic: room.isPublic }, returnToRoom: true });
+    navigation.navigate('PlatformSelect', {
+      draft: { isPublic: room.isPublic },
+      returnToRoom: true,
+      roomId: backendRoomId,
+    });
 
   return (
     <ScreenBackground glow="none">
@@ -134,7 +149,7 @@ export function RoomScreen({ navigation, route }: Props) {
           </View>
           <View style={[styles.topSide, styles.topRight]}>
             <IconButton icon="person-add" size={38} variant="glass" accessibilityLabel="Davet et" onPress={() => setInviteOpen(true)} />
-            <PressableCount count={room.participantCount} onPress={openUsers} />
+            <PressableCount count={count} onPress={openUsers} />
           </View>
         </View>
       )}
@@ -182,11 +197,11 @@ export function RoomScreen({ navigation, route }: Props) {
               <View style={styles.usersHeader}>
                 <View>
                   <Text style={[typography.title3, styles.usersTitle]}>Kullanıcılar</Text>
-                  <Text style={[typography.footnote, styles.usersSub]}>{room.participantCount} katılımcı</Text>
+                  <Text style={[typography.footnote, styles.usersSub]}>{count} katılımcı</Text>
                 </View>
                 <IconButton icon="close" size={32} iconSize={16} variant="solid" accessibilityLabel="Kapat" onPress={closeUsers} />
               </View>
-              <UsersPanel participants={room.participants} bottomInset={insets.bottom} onInvite={() => { closeUsers(); setTimeout(() => setInviteOpen(true), 260); }} />
+              <UsersPanel participants={participants} bottomInset={insets.bottom} onInvite={() => { closeUsers(); setTimeout(() => setInviteOpen(true), 260); }} />
             </View>
           </Animated.View>
         </View>

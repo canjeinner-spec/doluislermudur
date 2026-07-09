@@ -13,6 +13,7 @@ import { Icon, IconButton, NavBar, PressableScale, ScreenBackground } from '@/co
 import { getPlatform, userAgentFor } from '@/data';
 import { palette, spacing, typography } from '@/theme';
 import { storage, StorageKeys } from '@/storage/storage';
+import { createRoom, isBackendConfigured, updateRoomContent } from '@/backend';
 import type { RootStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WebViewLogin'>;
@@ -74,7 +75,7 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
   const pageUrlRef = useRef(platform?.loginUrl ?? '');
   const finishedRef = useRef(false);
 
-  const finish = (url?: string, title?: string) => {
+  const finish = async (url?: string, title?: string) => {
     if (finishedRef.current) return;
     finishedRef.current = true;
     const authed = storage.getJSON<string[]>(StorageKeys.authedPlatforms, []);
@@ -82,13 +83,35 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
       storage.setJSON(StorageKeys.authedPlatforms, [...authed, platformId]);
     }
     const cleaned = cleanTitle(title ?? pageTitleRef.current, platform?.name) || platform?.name || 'Oda';
-    const params = { draft, platformId, title: cleaned, contentUrl: url ?? pageUrlRef.current };
+    const contentUrl = url ?? pageUrlRef.current;
+    const localParams = { draft, platformId, title: cleaned, contentUrl };
+
+    // Changing content in an existing room: update it and pop back.
     if (route.params.returnToRoom) {
-      // Changing content: pop back to the existing room with the new video.
-      navigation.navigate('Room', params);
-    } else {
-      navigation.replace('Room', params);
+      if (isBackendConfigured && route.params.roomId) {
+        await updateRoomContent(route.params.roomId, contentUrl, cleaned);
+        navigation.navigate('Room', { roomId: route.params.roomId });
+      } else {
+        navigation.navigate('Room', localParams);
+      }
+      return;
     }
+
+    // New room: persist it so it shows up in everyone's list, then open it.
+    if (isBackendConfigured) {
+      const room = await createRoom({
+        title: cleaned,
+        platform: platformId,
+        platformLabel: platform?.name ?? '',
+        contentUrl,
+        isPublic: draft.isPublic,
+      });
+      if (room) {
+        navigation.replace('Room', { roomId: room.id });
+        return;
+      }
+    }
+    navigation.replace('Room', localParams);
   };
 
   // The probe tells us content is actually playing → hand off to the room with
@@ -158,7 +181,7 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
           </View>
         }
         right={
-          <PressableScale onPress={finish} accessibilityLabel="Odaya geç">
+          <PressableScale onPress={() => finish()} accessibilityLabel="Odaya geç">
             <View style={styles.goBtn}>
               <Icon name="chevron-right" size={22} color={palette.white} strokeWidth={2.4} />
             </View>

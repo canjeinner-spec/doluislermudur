@@ -10,8 +10,8 @@ export type RootStackParamList = {
   Home: undefined;
   Profile: undefined;
   CreateRoom: undefined;
-  PlatformSelect: { draft: RoomDraft; returnToRoom?: boolean };
-  WebViewLogin: { platformId: PlatformId; draft: RoomDraft; returnToRoom?: boolean };
+  PlatformSelect: { draft: RoomDraft; returnToRoom?: boolean; roomId?: string };
+  WebViewLogin: { platformId: PlatformId; draft: RoomDraft; returnToRoom?: boolean; roomId?: string };
   Room: {
     roomId?: string;
     draft?: RoomDraft;

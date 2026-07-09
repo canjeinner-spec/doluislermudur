@@ -46,6 +46,8 @@ export function VideoPlayer({ posterIndex, duration = 10090 }: Props) {
 
   const progress = useSharedValue(position / duration);
   const controlsOpacity = useSharedValue(1);
+  const trackW = useSharedValue(0);
+  const knobScale = useSharedValue(1);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Advance the clock while playing.
@@ -91,7 +93,11 @@ export function VideoPlayer({ posterIndex, duration = 10090 }: Props) {
     revealControls();
   };
 
-  const onTrackLayout = (e: LayoutChangeEvent) => setTrackWidth(e.nativeEvent.layout.width);
+  const onTrackLayout = (e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    setTrackWidth(w);
+    trackW.value = w;
+  };
 
   const commitSeek = (ratio: number) => {
     const clamped = Math.min(1, Math.max(0, ratio));
@@ -100,6 +106,7 @@ export function VideoPlayer({ posterIndex, duration = 10090 }: Props) {
 
   const scrub = Gesture.Pan()
     .onBegin((e) => {
+      knobScale.value = withTiming(1.35, { duration: 120 });
       runOnJS(setScrubbing)(true);
       if (trackWidth > 0) runOnJS(commitSeek)(e.x / trackWidth);
     })
@@ -107,14 +114,19 @@ export function VideoPlayer({ posterIndex, duration = 10090 }: Props) {
       if (trackWidth > 0) runOnJS(commitSeek)(e.x / trackWidth);
     })
     .onFinalize(() => {
+      knobScale.value = withTiming(1, { duration: 160 });
       runOnJS(setScrubbing)(false);
       runOnJS(revealControls)();
     });
 
-  const fillStyle = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` }));
+  // Pixel-based styles — animating numeric width / translateX avoids the native
+  // crash that string-percentage layout props trigger on the New Architecture.
+  const fillStyle = useAnimatedStyle(() => ({ width: progress.value * trackW.value }));
   const knobStyle = useAnimatedStyle(() => ({
-    left: `${progress.value * 100}%`,
-    transform: [{ scale: withTiming(scrubbing ? 1.35 : 1, { duration: 120 }) }],
+    transform: [
+      { translateX: progress.value * trackW.value },
+      { scale: knobScale.value },
+    ],
   }));
   const overlayStyle = useAnimatedStyle(() => ({ opacity: controlsOpacity.value }));
 

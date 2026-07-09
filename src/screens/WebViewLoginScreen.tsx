@@ -60,8 +60,9 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
     }
   };
 
+  // scaleX from the left edge — numeric transform, no string-percentage layout.
   const barStyle = useAnimatedStyle(() => ({
-    width: `${progress.value * 100}%`,
+    transform: [{ scaleX: progress.value }],
     opacity: progress.value > 0 && progress.value < 1 ? 1 : 0,
   }));
 
@@ -197,6 +198,8 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 2,
+    width: '100%',
+    transformOrigin: 'left',
     backgroundColor: palette.copper,
   },
   webWrap: {

@@ -34,7 +34,11 @@ export function Poster({ index, width, height, borderRadius = radius.sm, style }
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.center}>
-        <Icon name="film" size={Math.min(width, height) * 0.34} color="rgba(255,255,255,0.14)" />
+        <Icon
+          name="film"
+          size={Math.min(Math.min(width, height) * 0.34, 84)}
+          color="rgba(255,255,255,0.14)"
+        />
       </View>
     </View>
   );

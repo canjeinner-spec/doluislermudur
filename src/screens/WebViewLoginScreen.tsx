@@ -105,11 +105,8 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
   return (
     <ScreenBackground glow="none">
       <NavBar
-        compact
         left={
-          <PressableScale onPress={() => navigation.goBack()} accessibilityLabel="Kapat">
-            <Text style={[typography.body, styles.close]}>Kapat</Text>
-          </PressableScale>
+          <IconButton icon="close" size={38} variant="glass" accessibilityLabel="Kapat" onPress={() => navigation.goBack()} />
         }
         titleNode={
           <View style={styles.addressBar}>
@@ -126,7 +123,9 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
         }
         right={
           <PressableScale onPress={finish} accessibilityLabel="Odaya geç">
-            <Text style={[typography.bodyEmphasized, styles.done]}>Odaya Geç</Text>
+            <View style={styles.goBtn}>
+              <Icon name="chevron-right" size={22} color={palette.white} strokeWidth={2.4} />
+            </View>
           </PressableScale>
         }
       />
@@ -182,14 +181,6 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
         )}
       </View>
 
-      <View style={styles.notice}>
-        <Icon name="play" size={12} color={palette.amber} filled />
-        <Text style={[typography.caption1, styles.noticeText]}>
-          İçeriği başlat — oda otomatik açılır. Giriş {platform?.name} sayfasında yapılır, ASTERA
-          şifreni görmez.
-        </Text>
-      </View>
-
       {/* Browser toolbar */}
       <View style={[styles.toolbar, { paddingBottom: insets.bottom + spacing.xs }]}>
         <IconButton
@@ -219,11 +210,13 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  close: {
-    color: palette.amber,
-  },
-  done: {
-    color: palette.amber,
+  goBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: palette.copper,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addressBar: {
     flexDirection: 'row',

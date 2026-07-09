@@ -71,7 +71,9 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
   const vimeoUri = React.useMemo(() => toVimeo(uri), [uri]);
 
   const [playing, setPlaying] = useState(true);
-  const [muted, setMuted] = useState(false);
+  // YouTube starts muted so autoplay isn't blocked, then we unmute on play.
+  const [muted, setMuted] = useState<boolean>(!!extractYouTubeId(uri));
+  const didUnmute = useRef(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [hasVideo, setHasVideo] = useState(false);
@@ -219,6 +221,11 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
                 if (s === 'playing') {
                   setPlaying(true);
                   setHasVideo(true);
+                  // Bring the sound up once playback has actually begun.
+                  if (!didUnmute.current) {
+                    didUnmute.current = true;
+                    setTimeout(() => setMuted(false), 350);
+                  }
                 } else if (s === 'paused' || s === 'ended') {
                   setPlaying(false);
                 }

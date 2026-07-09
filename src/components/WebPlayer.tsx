@@ -8,6 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import YoutubePlayer, { YoutubeIframeRef } from 'react-native-youtube-iframe';
 
 import { palette, radius, spacing, typography } from '@/theme';
 import { Icon } from './icons';
@@ -25,25 +26,20 @@ export type ControlEvent =
   | { type: 'pause' }
   | { type: 'seek'; time: number };
 
-type Source = { uri: string; headers?: Record<string, string> };
-
-/**
- * Vimeo → clean embed. YouTube and everything else load their real page and are
- * driven through the injected <video> controller. (The youtube.com/embed player
- * is cleaner but returns error 150/152 for many videos, so we load the actual
- * watch page, which reliably plays.)
- */
-function normalizeSource(raw: string): Source {
-  const vimeo = raw.match(/vimeo\.com\/(?:video\/)?(\d+)/);
-  if (vimeo) return { uri: `https://player.vimeo.com/video/${vimeo[1]}?autoplay=1&playsinline=1` };
-  return { uri: raw };
+function extractYouTubeId(raw: string): string | null {
+  const m = raw.match(
+    /(?:youtube\.com\/(?:watch\?[^#]*\bv=|embed\/|shorts\/|v\/)|youtu\.be\/)([\w-]{11})/
+  );
+  return m ? m[1] : null;
 }
 
-/**
- * Controller injected into the provider page: it finds the largest <video>
- * element, unmutes and starts it once (autoplay policies begin muted), reports
- * state back to React Native, and applies play / pause / seek / mute commands.
- */
+function toVimeo(raw: string): string {
+  const vimeo = raw.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}?autoplay=1&playsinline=1`;
+  return raw;
+}
+
+/** Injected into non-YouTube pages: finds the <video>, unmutes it, reports state. */
 const CONTROLLER = `
 (function () {
   if (window.__astera) { return; } window.__astera = true;
@@ -70,7 +66,9 @@ const CONTROLLER = `
 
 export function WebPlayer({ uri, userAgent, onControl }: Props) {
   const webRef = useRef<WebView>(null);
-  const source = React.useMemo(() => normalizeSource(uri), [uri]);
+  const ytRef = useRef<YoutubeIframeRef>(null);
+  const ytId = React.useMemo(() => extractYouTubeId(uri), [uri]);
+  const vimeoUri = React.useMemo(() => toVimeo(uri), [uri]);
 
   const [playing, setPlaying] = useState(true);
   const [muted, setMuted] = useState(false);
@@ -79,20 +77,57 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
   const [hasVideo, setHasVideo] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
   const [trackWidth, setTrackWidth] = useState(0);
+  const [box, setBox] = useState({ w: 0, h: 0 });
 
   const progress = useSharedValue(0);
   const trackW = useSharedValue(0);
   const knobScale = useSharedValue(1);
 
-  const apply = useCallback((cmd: object) => {
+  // ── Command dispatch ────────────────────────────────────────────────
+  const applyWeb = useCallback((cmd: object) => {
     webRef.current?.injectJavaScript(`window.__asteraApply && window.__asteraApply(${JSON.stringify(cmd)}); true;`);
   }, []);
+
+  const togglePlay = () => {
+    const next = !playing;
+    setPlaying(next);
+    if (!ytId) applyWeb({ type: next ? 'play' : 'pause' });
+    onControl?.(next ? { type: 'play' } : { type: 'pause' });
+  };
+
+  const seekBy = (delta: number) => {
+    const next = Math.max(0, Math.min(duration || Infinity, position + delta));
+    if (ytId) ytRef.current?.seekTo(next, true);
+    else applyWeb({ type: 'seekBy', delta });
+    setPosition(next);
+  };
+
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    if (!ytId) applyWeb({ type: 'mute', value: next });
+  };
+
+  // ── YouTube state polling ───────────────────────────────────────────
+  useEffect(() => {
+    if (!ytId) return;
+    const iv = setInterval(async () => {
+      try {
+        if (scrubbing) return;
+        const t = await ytRef.current?.getCurrentTime();
+        if (typeof t === 'number') setPosition(t);
+      } catch {
+        /* ignore */
+      }
+    }, 700);
+    return () => clearInterval(iv);
+  }, [ytId, scrubbing]);
 
   useEffect(() => {
     if (!scrubbing) progress.value = duration > 0 ? position / duration : 0;
   }, [position, duration, scrubbing, progress]);
 
-  const onMessage = useCallback(
+  const onWebMessage = useCallback(
     (e: WebViewMessageEvent) => {
       try {
         const msg = JSON.parse(e.nativeEvent.data);
@@ -106,30 +141,13 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
           }
         }
       } catch {
-        /* ignore non-JSON */
+        /* ignore */
       }
     },
     [scrubbing]
   );
 
-  const togglePlay = () => {
-    const next = !playing;
-    setPlaying(next);
-    apply({ type: next ? 'play' : 'pause' });
-    onControl?.(next ? { type: 'play' } : { type: 'pause' });
-  };
-
-  const seekBy = (delta: number) => {
-    apply({ type: 'seekBy', delta });
-    setPosition((p) => Math.max(0, Math.min(duration || Infinity, p + delta)));
-  };
-
-  const toggleMute = () => {
-    const next = !muted;
-    setMuted(next);
-    apply({ type: 'mute', value: next });
-  };
-
+  // ── Timeline scrub ──────────────────────────────────────────────────
   const onTrackLayout = (e: LayoutChangeEvent) => {
     const w = e.nativeEvent.layout.width;
     setTrackWidth(w);
@@ -144,11 +162,11 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
 
   const commitSeek = (ratio: number) => {
     const clamped = Math.min(1, Math.max(0, ratio));
-    if (duration > 0) {
-      const time = clamped * duration;
-      apply({ type: 'seek', time });
-      onControl?.({ type: 'seek', time });
-    }
+    if (duration <= 0) return;
+    const time = clamped * duration;
+    if (ytId) ytRef.current?.seekTo(time, true);
+    else applyWeb({ type: 'seek', time });
+    onControl?.({ type: 'seek', time });
   };
 
   const scrub = Gesture.Pan()
@@ -172,34 +190,70 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
   }));
 
   return (
-    <View style={styles.container}>
-      <WebView
-        ref={webRef}
-        source={source}
-        style={styles.web}
-        injectedJavaScript={CONTROLLER}
-        onMessage={onMessage}
-        allowsInlineMediaPlayback
-        mediaPlaybackRequiresUserAction={false}
-        allowsFullscreenVideo={false}
-        sharedCookiesEnabled
-        thirdPartyCookiesEnabled
-        domStorageEnabled
-        javaScriptEnabled
-        allowsProtectedMedia
-        androidLayerType="hardware"
-        mixedContentMode="always"
-        originWhitelist={['http://*', 'https://*', 'about:*', 'data:*']}
-        onShouldStartLoadWithRequest={(r) =>
-          r.url.startsWith('http') || r.url.startsWith('about:') || r.url.startsWith('data:')
-        }
-        setSupportMultipleWindows={false}
-        userAgent={userAgent}
-        allowsBackForwardNavigationGestures={false}
-      />
+    <View
+      style={styles.container}
+      onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
+    >
+      {/* Media layer */}
+      {ytId ? (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          {box.h > 0 && (
+            <YoutubePlayer
+              ref={ytRef}
+              height={box.h}
+              width={box.w}
+              play={playing}
+              mute={muted}
+              videoId={ytId}
+              initialPlayerParams={{ controls: false, rel: false, preventFullScreen: true, iv_load_policy: 3 }}
+              onReady={async () => {
+                try {
+                  const d = await ytRef.current?.getDuration();
+                  if (d) setDuration(d);
+                } catch {
+                  /* ignore */
+                }
+                setHasVideo(true);
+              }}
+              onChangeState={(s: string) => {
+                if (s === 'playing') {
+                  setPlaying(true);
+                  setHasVideo(true);
+                } else if (s === 'paused' || s === 'ended') {
+                  setPlaying(false);
+                }
+              }}
+              webViewStyle={styles.ytWeb}
+              webViewProps={{ allowsInlineMediaPlayback: true, androidLayerType: 'hardware' }}
+            />
+          )}
+        </View>
+      ) : (
+        <WebView
+          ref={webRef}
+          source={{ uri: vimeoUri }}
+          style={styles.web}
+          injectedJavaScript={CONTROLLER}
+          onMessage={onWebMessage}
+          allowsInlineMediaPlayback
+          mediaPlaybackRequiresUserAction={false}
+          allowsFullscreenVideo={false}
+          sharedCookiesEnabled
+          thirdPartyCookiesEnabled
+          domStorageEnabled
+          javaScriptEnabled
+          allowsProtectedMedia
+          androidLayerType="hardware"
+          mixedContentMode="always"
+          originWhitelist={['http://*', 'https://*', 'about:*', 'data:*']}
+          onShouldStartLoadWithRequest={(r) => r.url.startsWith('http') || r.url.startsWith('about:') || r.url.startsWith('data:')}
+          setSupportMultipleWindows={false}
+          userAgent={userAgent}
+          allowsBackForwardNavigationGestures={false}
+        />
+      )}
 
-      {/* Controls float over the video; box-none lets touches reach the WebView
-          in the gaps so provider pages stay interactive. */}
+      {/* Controls float over the video */}
       <View style={styles.overlay} pointerEvents="box-none">
         <View style={styles.topRow} pointerEvents="box-none">
           <View style={styles.livePill}>
@@ -280,6 +334,7 @@ const styles = StyleSheet.create({
     borderColor: palette.glassBorder,
   },
   web: { ...StyleSheet.absoluteFillObject, backgroundColor: palette.black },
+  ytWeb: { backgroundColor: palette.black, opacity: 0.999 },
   overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'space-between', padding: spacing.md },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   livePill: {

@@ -34,7 +34,6 @@ export function CreateRoomScreen({ navigation }: Props) {
     <ScreenBackground glow="top">
       <NavBar
         compact
-        title="Oda Oluştur"
         left={
           <IconButton
             icon="chevron-left"
@@ -47,15 +46,15 @@ export function CreateRoomScreen({ navigation }: Props) {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 132 }]}
       >
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
             <Icon name="film" size={30} color={palette.amberBright} />
           </View>
-          <Text style={[typography.title2, styles.heroTitle]}>Birlikte izleyin</Text>
+          <Text style={[typography.title1, styles.heroTitle]}>Yeni Oda</Text>
           <Text style={[typography.subhead, styles.heroSub]}>
-            Odanın gizliliğini seç. İçeriği bir sonraki adımda platformdan başlatınca oda otomatik
+            Odanın gizliliğini seç. İçeriği sonraki adımda platformdan başlatınca oda otomatik
             olarak açılır.
           </Text>
         </View>
@@ -120,12 +119,13 @@ function PrivacyRow({
 const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.md,
   },
   hero: {
     alignItems: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.xl,
+    paddingTop: spacing.xxxl,
+    paddingBottom: spacing.xxl,
   },
   heroIcon: {
     width: 68,
@@ -211,8 +211,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    backgroundColor: 'rgba(9,9,9,0.6)',
+    paddingTop: spacing.lg,
+    backgroundColor: 'rgba(9,9,9,0.85)',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: palette.separator,
   },

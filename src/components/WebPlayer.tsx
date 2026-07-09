@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -261,6 +261,7 @@ export function WebPlayer({ uri, userAgent, fill, onToggleFullscreen, fullscreen
               play={playing}
               mute={muted}
               videoId={ytId}
+              forceAndroidAutoplay={Platform.OS === 'android'}
               initialPlayerParams={{ controls: false, rel: false, preventFullScreen: true, iv_load_policy: 3 }}
               onReady={async () => {
                 try {

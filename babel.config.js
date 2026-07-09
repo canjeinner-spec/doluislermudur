@@ -12,8 +12,9 @@ module.exports = function (api) {
           },
         },
       ],
-      // react-native-reanimated/plugin must be listed last.
-      'react-native-reanimated/plugin',
+      // Reanimated 4 ships its Babel plugin from react-native-worklets.
+      // It must be listed last.
+      'react-native-worklets/plugin',
     ],
   };
 };

@@ -1,14 +1,5 @@
 import React, { useState } from 'react';
-import {
-  NativeSyntheticEvent,
-  StyleProp,
-  StyleSheet,
-  Text,
-  TextInput,
-  TextInputFocusEventData,
-  View,
-  ViewStyle,
-} from 'react-native';
+import { StyleProp, StyleSheet, Text, TextInput, View, ViewStyle } from 'react-native';
 
 import { palette, radius, spacing, typography } from '@/theme';
 import { Icon, IconName } from './icons';
@@ -45,7 +36,7 @@ export function TextField({
 }: Props) {
   const [focused, setFocused] = useState(false);
 
-  const onFocus = (_e: NativeSyntheticEvent<TextInputFocusEventData>) => setFocused(true);
+  const onFocus = () => setFocused(true);
   const onBlur = () => setFocused(false);
 
   return (

@@ -60,7 +60,13 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
       storage.setJSON(StorageKeys.authedPlatforms, [...authed, platformId]);
     }
     const title = cleanTitle(pageTitleRef.current, platform?.name) || platform?.name || 'Oda';
-    navigation.replace('Room', { draft, platformId, title, contentUrl: pageUrlRef.current });
+    const params = { draft, platformId, title, contentUrl: pageUrlRef.current };
+    if (route.params.returnToRoom) {
+      // Changing content: pop back to the existing room with the new video.
+      navigation.navigate('Room', params);
+    } else {
+      navigation.replace('Room', params);
+    }
   };
 
   const onNavState = (nav: WebViewNavigation) => {

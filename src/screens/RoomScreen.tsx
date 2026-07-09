@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -13,7 +14,6 @@ import {
   BottomSheet,
   Icon,
   IconButton,
-  ListRow,
   PlatformLogo,
   PressableScale,
   ScreenBackground,
@@ -70,9 +70,10 @@ function useRoom(params: Props['route']['params']): Room {
 export function RoomScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const room = useRoom(route.params);
+  const contentUrl = route.params.contentUrl;
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [usersOpen, setUsersOpen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
 
   const usersProgress = useSharedValue(0);
   const openUsers = () => {
@@ -89,42 +90,82 @@ export function RoomScreen({ navigation, route }: Props) {
   }));
   const scrimStyle = useAnimatedStyle(() => ({ opacity: usersProgress.value }));
 
+  const toggleFullscreen = useCallback(async () => {
+    const next = !fullscreen;
+    setFullscreen(next);
+    try {
+      await ScreenOrientation.lockAsync(
+        next ? ScreenOrientation.OrientationLock.LANDSCAPE : ScreenOrientation.OrientationLock.PORTRAIT_UP
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [fullscreen]);
+
+  // Always restore portrait when leaving the room.
+  useEffect(() => {
+    return () => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+    };
+  }, []);
+
+  const changeContent = () =>
+    navigation.navigate('PlatformSelect', { draft: { isPublic: room.isPublic }, returnToRoom: true });
+
   return (
     <ScreenBackground glow="none">
-      {/* Top bar — X + settings · title · invite + participants */}
-      <View style={[styles.topBar, { paddingTop: insets.top + spacing.xs }]}>
-        <View style={styles.topSide}>
-          <IconButton icon="close" size={38} variant="glass" accessibilityLabel="Odadan çık" onPress={() => navigation.goBack()} />
-          <IconButton icon="settings" size={38} variant="glass" accessibilityLabel="Oda ayarları" onPress={() => setSettingsOpen(true)} />
-        </View>
-        <View style={styles.titleWrap} pointerEvents="none">
-          <Text style={[typography.subheadEmphasized, styles.title]} numberOfLines={1}>
-            {room.title}
-          </Text>
-          <View style={styles.subRow}>
-            <PlatformLogo id={room.platform} size={12} />
-            <Text style={[typography.caption2, styles.sub]} numberOfLines={1}>
-              {room.platformLabel}
+      {/* Top bar — X + fullscreen · title · invite + participants */}
+      {!fullscreen && (
+        <View style={[styles.topBar, { paddingTop: insets.top + spacing.xs }]}>
+          <View style={styles.topSide}>
+            <IconButton icon="close" size={38} variant="glass" accessibilityLabel="Odadan çık" onPress={() => navigation.goBack()} />
+            <IconButton icon="fullscreen" size={38} variant="glass" accessibilityLabel="Tam ekran" onPress={toggleFullscreen} />
+          </View>
+          <View style={styles.titleWrap} pointerEvents="none">
+            <Text style={[typography.subheadEmphasized, styles.title]} numberOfLines={1}>
+              {room.title}
             </Text>
+            <View style={styles.subRow}>
+              <PlatformLogo id={room.platform} size={12} />
+              <Text style={[typography.caption2, styles.sub]} numberOfLines={1}>
+                {room.platformLabel}
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.topSide, styles.topRight]}>
+            <IconButton icon="person-add" size={38} variant="glass" accessibilityLabel="Davet et" onPress={() => setInviteOpen(true)} />
+            <PressableCount count={room.participantCount} onPress={openUsers} />
           </View>
         </View>
-        <View style={[styles.topSide, styles.topRight]}>
-          <IconButton icon="person-add" size={38} variant="glass" accessibilityLabel="Davet et" onPress={() => setInviteOpen(true)} />
-          <PressableCount count={room.participantCount} onPress={openUsers} />
-        </View>
-      </View>
+      )}
 
-      {/* Player */}
-      <View style={styles.playerWrap}>
-        {route.params.contentUrl ? (
-          <WebPlayer uri={route.params.contentUrl} userAgent={userAgentFor(room.platform, Platform.OS)} />
+      {/* Player — full-bleed; expands to cover the screen in fullscreen */}
+      <View style={[styles.playerWrap, fullscreen && styles.playerFull]}>
+        {contentUrl ? (
+          <WebPlayer
+            key={contentUrl}
+            uri={contentUrl}
+            userAgent={userAgentFor(room.platform, Platform.OS)}
+            fill={fullscreen}
+            fullscreen={fullscreen}
+            onToggleFullscreen={toggleFullscreen}
+          />
         ) : (
-          <VideoPlayer posterIndex={room.posterIndex} />
+          <VideoPlayer posterIndex={room.posterIndex} fill={fullscreen} />
         )}
       </View>
 
       {/* Chat fills the rest of the screen */}
-      <ChatView bottomInset={insets.bottom} nowPlaying={room.title} />
+      {!fullscreen && (
+        <ChatView bottomInset={insets.bottom} nowPlaying={room.title} onChangeContent={changeContent} />
+      )}
+
+      {/* Fullscreen exit (works for any player) */}
+      {fullscreen && (
+        <View style={[styles.fsExit, { top: insets.top + spacing.sm, left: insets.left + spacing.lg }]}>
+          <IconButton icon="close" size={40} variant="glass" accessibilityLabel="Tam ekranı kapat" onPress={toggleFullscreen} />
+        </View>
+      )}
 
       {/* Users slide-over from the right */}
       {usersOpen && (
@@ -152,14 +193,6 @@ export function RoomScreen({ navigation, route }: Props) {
 
       <BottomSheet visible={inviteOpen} onClose={() => setInviteOpen(false)} title="Arkadaş Davet Et" height={0.7}>
         <InviteFriendsSheet roomName={room.title} />
-      </BottomSheet>
-
-      <BottomSheet visible={settingsOpen} onClose={() => setSettingsOpen(false)} title="Oda" height={0.42}>
-        <View style={styles.actions}>
-          <ListRow title="Arkadaş Davet Et" subtitle="Bu odaya davet linki gönder" leadingIcon="person-add" showChevron onPress={() => { setSettingsOpen(false); setTimeout(() => setInviteOpen(true), 220); }} />
-          <ListRow title="Davet Linkini Kopyala" subtitle="astera.app/join/8F3K2Q" leadingIcon="share" showChevron onPress={() => setSettingsOpen(false)} />
-          <ListRow title="Odadan Ayrıl" leadingIcon="close" leadingTint={palette.danger} destructive onPress={() => { setSettingsOpen(false); setTimeout(() => navigation.goBack(), 200); }} />
-        </View>
       </BottomSheet>
     </ScreenBackground>
   );
@@ -191,7 +224,17 @@ const styles = StyleSheet.create({
   title: { color: palette.textPrimary, maxWidth: 180 },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   sub: { color: palette.textSecondary },
-  playerWrap: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  playerWrap: { width: '100%' },
+  playerFull: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 50,
+    backgroundColor: palette.black,
+  },
+  fsExit: { position: 'absolute', zIndex: 60 },
   scrim: { backgroundColor: 'rgba(0,0,0,0.55)' },
   usersPanel: {
     position: 'absolute',
@@ -228,7 +271,6 @@ const styles = StyleSheet.create({
   },
   usersTitle: { color: palette.textPrimary },
   usersSub: { color: palette.textTertiary, marginTop: 1 },
-  actions: { gap: spacing.sm, paddingTop: spacing.xs },
   countBtn: {
     flexDirection: 'row',
     alignItems: 'center',

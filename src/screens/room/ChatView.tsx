@@ -19,6 +19,7 @@ type Props = {
   bottomInset: number;
   nowPlaying: string;
   inviteCode?: string;
+  onChangeContent?: () => void;
 };
 
 /**
@@ -27,7 +28,7 @@ type Props = {
  * right-aligned plain text. System notices (now-playing, invite, joins) are
  * woven into the stream.
  */
-export function ChatView({ bottomInset, nowPlaying, inviteCode = '8F3K2Q' }: Props) {
+export function ChatView({ bottomInset, nowPlaying, inviteCode = '8F3K2Q', onChangeContent }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>(CHAT_SEED);
   const [draft, setDraft] = useState('');
   const listRef = useRef<FlatList<ChatMessage>>(null);
@@ -73,6 +74,14 @@ export function ChatView({ bottomInset, nowPlaying, inviteCode = '8F3K2Q' }: Pro
               <Text style={styles.systemText}>
                 Şimdi <Text style={styles.systemStrong}>{nowPlaying}</Text> oynatılıyor
               </Text>
+              {onChangeContent && (
+                <PressableScale onPress={onChangeContent} activeScale={0.9} accessibilityLabel="İçeriği değiştir">
+                  <View style={styles.changeBtn}>
+                    <Icon name="repeat" size={13} color={palette.amberBright} strokeWidth={2.2} />
+                    <Text style={styles.changeText}>Değiştir</Text>
+                  </View>
+                </PressableScale>
+              )}
             </View>
             <View style={styles.systemRow}>
               <Icon name="share" size={13} color={palette.textTertiary} />
@@ -168,6 +177,16 @@ const styles = StyleSheet.create({
   },
   systemText: { ...typography.footnote, color: palette.textSecondary, flex: 1 },
   systemStrong: { color: palette.textPrimary, fontWeight: '700' },
+  changeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: palette.accentTintSoft,
+  },
+  changeText: { ...typography.caption1, color: palette.amberBright, fontWeight: '700' },
   inviteText: { ...typography.footnote, color: palette.textTertiary, flex: 1 },
   inviteLink: { color: palette.amber, fontWeight: '600', textDecorationLine: 'underline' },
   otherRow: {

@@ -15,6 +15,8 @@ import { PressableScale } from './PressableScale';
 
 type Props = {
   posterIndex: number;
+  /** Fill the parent (fullscreen) instead of a fixed 16:9 frame. */
+  fill?: boolean;
   /** Total runtime in seconds (used for the time labels). */
   duration?: number;
 };
@@ -33,7 +35,7 @@ function fmt(totalSeconds: number): string {
  * a real, interactive control set: play/pause, ±10s, a draggable timeline,
  * volume and fullscreen — all spring-animated and synced to a ticking clock.
  */
-export function VideoPlayer({ posterIndex, duration = 10090 }: Props) {
+export function VideoPlayer({ posterIndex, fill, duration = 10090 }: Props) {
   const [playing, setPlaying] = useState(true);
   const [muted, setMuted] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -129,7 +131,7 @@ export function VideoPlayer({ posterIndex, duration = 10090 }: Props) {
   const overlayStyle = useAnimatedStyle(() => ({ opacity: controlsOpacity.value }));
 
   return (
-    <View style={[styles.container, fullscreen && styles.fullscreen]}>
+    <View style={[styles.container, fill && styles.containerFill, fullscreen && styles.fullscreen]}>
       {/* Poster background drawn inline (no fixed 9999 sizing / giant SVG). */}
       <LinearGradient
         colors={posterGradients[posterIndex % posterGradients.length]}
@@ -263,11 +265,12 @@ function TransportButton({
 const styles = StyleSheet.create({
   container: {
     aspectRatio: 16 / 9,
-    borderRadius: radius.lg,
     overflow: 'hidden',
     backgroundColor: palette.black,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: palette.glassBorder,
+  },
+  containerFill: {
+    aspectRatio: undefined,
+    flex: 1,
   },
   fullscreen: {
     aspectRatio: undefined,

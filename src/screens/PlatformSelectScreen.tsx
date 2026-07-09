@@ -27,7 +27,11 @@ export function PlatformSelectScreen({ navigation, route }: Props) {
     // Always open the provider so the user can start their content; the room
     // opens once playback begins. If already signed in, cookies persist so no
     // credentials are re-entered — the WebView lands straight on the catalog.
-    navigation.navigate('WebViewLogin', { platformId: platformId as never, draft });
+    navigation.navigate('WebViewLogin', {
+      platformId: platformId as never,
+      draft,
+      returnToRoom: route.params.returnToRoom,
+    });
   };
 
   return (

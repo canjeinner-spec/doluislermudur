@@ -17,6 +17,11 @@ import { PressableScale } from './PressableScale';
 type Props = {
   uri: string;
   userAgent?: string;
+  /** Fill the parent (fullscreen) instead of a fixed 16:9 frame. */
+  fill?: boolean;
+  /** Fullscreen toggle shown in the controls. */
+  onToggleFullscreen?: () => void;
+  fullscreen?: boolean;
   /** Called with play/pause/seek intents so a sync layer can broadcast them. */
   onControl?: (event: ControlEvent) => void;
 };
@@ -64,7 +69,7 @@ const CONTROLLER = `
 })();
 `;
 
-export function WebPlayer({ uri, userAgent, onControl }: Props) {
+export function WebPlayer({ uri, userAgent, fill, onToggleFullscreen, fullscreen, onControl }: Props) {
   const webRef = useRef<WebView>(null);
   const ytRef = useRef<YoutubeIframeRef>(null);
   const ytId = React.useMemo(() => extractYouTubeId(uri), [uri]);
@@ -232,9 +237,17 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
   }));
   const overlayStyle = useAnimatedStyle(() => ({ opacity: controlsOpacity.value }));
 
+  // Fit a 16:9 video inside the frame (works for both 16:9 and fullscreen).
+  let ytW = box.w;
+  let ytH = Math.ceil(box.w * (9 / 16));
+  if (box.h > 0 && ytH > box.h) {
+    ytH = box.h;
+    ytW = Math.ceil(box.h * (16 / 9));
+  }
+
   return (
     <View
-      style={styles.container}
+      style={[styles.container, fill && styles.containerFill]}
       onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
     >
       {/* Media layer */}
@@ -243,8 +256,8 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
           {box.w > 0 && (
             <YoutubePlayer
               ref={ytRef}
-              width={box.w}
-              height={Math.ceil(box.w * (9 / 16))}
+              width={ytW}
+              height={ytH}
               play={playing}
               mute={muted}
               videoId={ytId}
@@ -324,7 +337,16 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
             <View style={styles.liveDot} />
             <Text style={styles.liveText}>CANLI</Text>
           </View>
-          <ControlButton icon="volume" label="Ses" active={!muted} onPress={toggleMute} />
+          <View style={styles.topRight}>
+            <ControlButton icon="volume" label="Ses" active={!muted} onPress={toggleMute} />
+            {onToggleFullscreen && (
+              <ControlButton
+                icon="fullscreen"
+                label={fullscreen ? 'Küçült' : 'Tam ekran'}
+                onPress={onToggleFullscreen}
+              />
+            )}
+          </View>
         </View>
 
         <View style={styles.center} pointerEvents="box-none">
@@ -364,7 +386,7 @@ function ControlButton({
   big,
   active = true,
 }: {
-  icon: 'backward' | 'forward' | 'volume';
+  icon: 'backward' | 'forward' | 'volume' | 'fullscreen';
   label: string;
   onPress: () => void;
   big?: boolean;
@@ -391,12 +413,14 @@ function fmt(totalSeconds: number): string {
 const styles = StyleSheet.create({
   container: {
     aspectRatio: 16 / 9,
-    borderRadius: radius.lg,
     overflow: 'hidden',
     backgroundColor: palette.black,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: palette.glassBorder,
   },
+  containerFill: {
+    aspectRatio: undefined,
+    flex: 1,
+  },
+  topRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   web: { ...StyleSheet.absoluteFillObject, backgroundColor: palette.black },
   ytLayer: {
     ...StyleSheet.absoluteFillObject,

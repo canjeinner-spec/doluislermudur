@@ -16,6 +16,8 @@ export type RootStackParamList = {
     platformId?: PlatformId;
     /** Title captured from the provider page (the content being watched). */
     title?: string;
+    /** The provider content URL to load in the room's embedded player. */
+    contentUrl?: string;
   };
 };
 

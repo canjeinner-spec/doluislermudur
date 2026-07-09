@@ -16,6 +16,7 @@ export { NavBar } from './NavBar';
 export { RoomCard } from './RoomCard';
 export { BottomSheet } from './BottomSheet';
 export { VideoPlayer } from './VideoPlayer';
+export { WebPlayer } from './WebPlayer';
 export { Sidebar } from './Sidebar';
 export type { SidebarDestination } from './Sidebar';
 export { Icon } from './icons';

@@ -46,6 +46,7 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
   const [secure, setSecure] = useState(true);
   const progress = useSharedValue(0);
   const pageTitleRef = useRef('');
+  const pageUrlRef = useRef(platform?.loginUrl ?? '');
   const finishedRef = useRef(false);
 
   const finish = () => {
@@ -56,13 +57,14 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
       storage.setJSON(StorageKeys.authedPlatforms, [...authed, platformId]);
     }
     const title = cleanTitle(pageTitleRef.current, platform?.name) || platform?.name || 'Oda';
-    navigation.replace('Room', { draft, platformId, title });
+    navigation.replace('Room', { draft, platformId, title, contentUrl: pageUrlRef.current });
   };
 
   const onNavState = (nav: WebViewNavigation) => {
     setCanGoBack(nav.canGoBack);
     setCanGoForward(nav.canGoForward);
     if (nav.title) pageTitleRef.current = nav.title;
+    pageUrlRef.current = nav.url;
     // Parse with a regex rather than `new URL` (Hermes' URL is incomplete).
     const match = /^(\w+):\/\/([^/?#]+)([^?#]*)(\?[^#]*)?/.exec(nav.url);
     if (!match) return;

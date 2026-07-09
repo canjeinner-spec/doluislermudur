@@ -19,6 +19,7 @@ import {
   ScreenBackground,
   SegmentedControl,
   VideoPlayer,
+  WebPlayer,
 } from '@/components';
 import { CURRENT_USER, ROOMS, getPlatform, type Participant, type Room } from '@/data';
 import { palette, spacing, typography } from '@/theme';
@@ -149,9 +150,14 @@ export function RoomScreen({ navigation, route }: Props) {
         </View>
       </View>
 
-      {/* Player */}
+      {/* Player — real provider WebView when we have a content URL, else the
+          decorative player for the sample rooms in the list. */}
       <View style={styles.playerWrap}>
-        <VideoPlayer posterIndex={room.posterIndex} />
+        {route.params.contentUrl ? (
+          <WebPlayer uri={route.params.contentUrl} />
+        ) : (
+          <VideoPlayer posterIndex={room.posterIndex} />
+        )}
       </View>
 
       {/* Tabs */}

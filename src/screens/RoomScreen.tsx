@@ -145,6 +145,7 @@ export function RoomScreen({ navigation, route }: Props) {
           <WebPlayer
             key={contentUrl}
             uri={contentUrl}
+            platform={room.platform}
             userAgent={userAgentFor(room.platform, Platform.OS)}
             fill={fullscreen}
             fullscreen={fullscreen}

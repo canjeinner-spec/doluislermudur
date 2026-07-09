@@ -168,6 +168,9 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
             allowsBackForwardNavigationGestures
             sharedCookiesEnabled
             thirdPartyCookiesEnabled
+            domStorageEnabled
+            cacheEnabled
+            javaScriptEnabled
             allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
             allowsProtectedMedia

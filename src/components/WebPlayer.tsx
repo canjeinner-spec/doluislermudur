@@ -17,6 +17,8 @@ import { PressableScale } from './PressableScale';
 type Props = {
   uri: string;
   userAgent?: string;
+  /** Provider id (netflix, prime, gdrive, …) — tailors the injected controller. */
+  platform?: string;
   /** Fill the parent (fullscreen) instead of a fixed 16:9 frame. */
   fill?: boolean;
   /** Fullscreen toggle shown in the controls. */
@@ -44,36 +46,76 @@ function toVimeo(raw: string): string {
   return raw;
 }
 
-/** Injected into non-YouTube pages: finds the <video>, unmutes it, reports state. */
-const CONTROLLER = `
+/**
+ * CSS that hides a provider's own player chrome (bottom scrubber, top bar) so
+ * only ASTERA's overlay drives playback — "the controller is ours, the embed is
+ * theirs". Selectors are best-effort; anything unmatched just stays visible.
+ */
+const CHROME_CSS: Record<string, string> = {
+  netflix:
+    '.watch-video--bottom-controls-container,.PlayerControlsNeo__bottom-controls,.PlayerControlsNeo__button-control-row,.watch-video--back-container,.watch-video--evidence-overlay-container{opacity:0!important;pointer-events:none!important;}',
+  prime:
+    '.atvwebplayersdk-bottompanel-container,.atvwebplayersdk-hideabletopbuttons-container,.atvwebplayersdk-timeindicator-text,.atvwebplayersdk-fastseekback-button,.atvwebplayersdk-fastseekforward-button,.atvwebplayersdk-playpause-button{opacity:0!important;pointer-events:none!important;}',
+};
+
+/**
+ * Injected into every WebView provider page (Netflix, Prime, Drive, …). It:
+ *   • finds the real content <video> (largest with a live source),
+ *   • reports playback state so our overlay stays in sync,
+ *   • exposes window.__asteraApply so our controls drive play/pause/seek/mute,
+ *   • hides the provider's native chrome (per CHROME_CSS),
+ *   • flags a sign-in gate so the room shows a hint instead of fake controls.
+ */
+function buildController(platform: string): string {
+  const hideCss = CHROME_CSS[platform] ?? '';
+  return `
 (function () {
   if (window.__astera) { return; } window.__astera = true;
   var RNW = window.ReactNativeWebView;
+  var HIDE_CSS = ${JSON.stringify(hideCss)};
   function post(o){ try { RNW.postMessage(JSON.stringify(o)); } catch (e) {} }
+  function ensureStyle(){ if(!HIDE_CSS) return; if(document.getElementById('__astera_css')) return;
+    try{var s=document.createElement('style');s.id='__astera_css';s.innerHTML=HIDE_CSS;(document.head||document.documentElement).appendChild(s);}catch(e){} }
   function findVideo(){
-    var best=null,area=0,list=document.querySelectorAll('video');
-    for(var i=0;i<list.length;i++){var v=list[i];var a=(v.clientWidth||0)*(v.clientHeight||0);
-      if(a>=area&&(v.src||v.currentSrc||v.readyState>0)){area=a;best=v;}}
-    return best||list[0]||null;
+    var best=null,area=-1,list=document.querySelectorAll('video');
+    for(var i=0;i<list.length;i++){var v=list[i];var r=v.getBoundingClientRect();var a=r.width*r.height;
+      if((v.src||v.currentSrc||v.readyState>0)&&a>=area){area=a;best=v;}}
+    return best;
   }
-  var inited=false;
-  function report(){var v=findVideo();if(!v){post({t:'state',has:false});return;}
-    if(!inited){inited=true;try{v.muted=false;v.volume=1;var p=v.play();if(p&&p.catch)p.catch(function(){});}catch(e){}}
-    post({t:'state',has:true,time:v.currentTime||0,dur:isFinite(v.duration)?v.duration:0,paused:!!v.paused,muted:!!v.muted});}
+  function isSignin(){
+    var p=document.querySelector('input[type=password]');
+    if(p){var r=p.getBoundingClientRect();if(r.width>0&&r.height>0)return true;}
+    return false;
+  }
+  var unmuted=false;
+  function report(){
+    ensureStyle();
+    var v=findVideo();
+    if(!v||v.readyState<1){ post({t:'state',has:false,signin:isSignin()}); return; }
+    // Only take over the sound once the main content is genuinely rolling —
+    // avoids hijacking a muted hero/preview clip on a browse page.
+    var big=(v.clientWidth*v.clientHeight)>(window.innerWidth*window.innerHeight*0.35);
+    if(!unmuted&&big&&!v.paused){unmuted=true;try{v.muted=false;v.volume=1;}catch(e){}}
+    post({t:'state',has:true,signin:false,time:v.currentTime||0,dur:isFinite(v.duration)?v.duration:0,paused:!!v.paused,muted:!!v.muted});
+  }
   window.__asteraApply=function(cmd){var v=findVideo();if(!v)return;try{
-    if(cmd.type==='play'){v.muted=false;v.play();}else if(cmd.type==='pause'){v.pause();}
-    else if(cmd.type==='seek'){v.currentTime=cmd.time;}else if(cmd.type==='seekBy'){v.currentTime=Math.max(0,(v.currentTime||0)+cmd.delta);}
+    if(cmd.type==='play'){v.muted=false;var p=v.play();if(p&&p.catch)p.catch(function(){});}
+    else if(cmd.type==='pause'){v.pause();}
+    else if(cmd.type==='seek'){v.currentTime=cmd.time;}
+    else if(cmd.type==='seekBy'){v.currentTime=Math.max(0,(v.currentTime||0)+cmd.delta);}
     else if(cmd.type==='mute'){v.muted=!!cmd.value;}}catch(e){}setTimeout(report,60);};
-  ['play','pause','seeked','ended','loadedmetadata','canplay'].forEach(function(ev){document.addEventListener(ev,report,true);});
-  setInterval(report,800);report();true;
+  ['play','pause','seeked','ended','loadedmetadata','canplay','timeupdate'].forEach(function(ev){document.addEventListener(ev,report,true);});
+  setInterval(report,800);ensureStyle();report();true;
 })();
 `;
+}
 
-export function WebPlayer({ uri, userAgent, fill, onToggleFullscreen, fullscreen, onControl }: Props) {
+export function WebPlayer({ uri, userAgent, platform, fill, onToggleFullscreen, fullscreen, onControl }: Props) {
   const webRef = useRef<WebView>(null);
   const ytRef = useRef<YoutubeIframeRef>(null);
   const ytId = React.useMemo(() => extractYouTubeId(uri), [uri]);
   const vimeoUri = React.useMemo(() => toVimeo(uri), [uri]);
+  const controller = React.useMemo(() => buildController(platform ?? ''), [platform]);
 
   const [playing, setPlaying] = useState(true);
   // YouTube starts muted so autoplay isn't blocked, then we unmute on play.
@@ -82,6 +124,7 @@ export function WebPlayer({ uri, userAgent, fill, onToggleFullscreen, fullscreen
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [hasVideo, setHasVideo] = useState(false);
+  const [signin, setSignin] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
   const [trackWidth, setTrackWidth] = useState(0);
   const [box, setBox] = useState({ w: 0, h: 0 });
@@ -180,6 +223,7 @@ export function WebPlayer({ uri, userAgent, fill, onToggleFullscreen, fullscreen
         const msg = JSON.parse(e.nativeEvent.data);
         if (msg.t === 'state') {
           setHasVideo(!!msg.has);
+          setSignin(!!msg.signin);
           if (msg.has) {
             if (!scrubbing && typeof msg.time === 'number') setPosition(msg.time);
             if (typeof msg.dur === 'number' && msg.dur > 0) setDuration(msg.dur);
@@ -298,7 +342,7 @@ export function WebPlayer({ uri, userAgent, fill, onToggleFullscreen, fullscreen
           ref={webRef}
           source={{ uri: vimeoUri }}
           style={styles.web}
-          injectedJavaScript={CONTROLLER}
+          injectedJavaScript={controller}
           onMessage={onWebMessage}
           allowsInlineMediaPlayback
           mediaPlaybackRequiresUserAction={false}
@@ -306,6 +350,7 @@ export function WebPlayer({ uri, userAgent, fill, onToggleFullscreen, fullscreen
           sharedCookiesEnabled
           thirdPartyCookiesEnabled
           domStorageEnabled
+          cacheEnabled
           javaScriptEnabled
           allowsProtectedMedia
           androidLayerType="hardware"
@@ -328,8 +373,23 @@ export function WebPlayer({ uri, userAgent, fill, onToggleFullscreen, fullscreen
         />
       )}
 
-      {/* Controls float over the video (auto-hide on YouTube) */}
-      <Animated.View style={[styles.overlay, overlayStyle]} pointerEvents={controlsVisible ? 'box-none' : 'none'}>
+      {/* A provider sign-in gate is showing inside the embed — step aside so the
+          user can log in on the page itself, with just a hint at the top. */}
+      {signin && !ytId && (
+        <View style={styles.signinHint} pointerEvents="none">
+          <Icon name="lock" size={13} color={palette.white} strokeWidth={2} />
+          <Text style={styles.signinText}>Bu cihazda hesabınızla giriş yapın</Text>
+        </View>
+      )}
+
+      {/* Controls float over the video (auto-hide on YouTube). Hidden while a
+          sign-in gate is up so it doesn't overlap the login form. */}
+      <Animated.View
+        style={[styles.overlay, overlayStyle]}
+        pointerEvents={controlsVisible && !(signin && !ytId) ? 'box-none' : 'none'}
+      >
+        {signin && !ytId ? null : (
+        <>
         <View style={styles.topRow} pointerEvents="box-none">
           <View style={styles.livePill}>
             <View style={styles.liveDot} />
@@ -372,6 +432,8 @@ export function WebPlayer({ uri, userAgent, fill, onToggleFullscreen, fullscreen
             </View>
           </GestureDetector>
         </View>
+        </>
+        )}
       </Animated.View>
     </View>
   );
@@ -462,6 +524,20 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.14)',
   },
   ctrlBig: { width: 46, height: 46, borderRadius: 23 },
+  signinHint: {
+    position: 'absolute',
+    top: spacing.md,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    zIndex: 5,
+  },
+  signinText: { ...typography.caption1, color: palette.white, fontWeight: '600' },
   bottom: { gap: spacing.xs },
   timeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   time: {

@@ -9,6 +9,7 @@ import {
 } from '@react-navigation/native';
 
 import { palette } from '@/theme';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RootNavigator } from '@/navigation/RootNavigator';
 
 const asteraTheme: Theme = {
@@ -30,7 +31,9 @@ export default function App() {
       <SafeAreaProvider>
         <NavigationContainer theme={asteraTheme}>
           <StatusBar style="light" />
-          <RootNavigator />
+          <ErrorBoundary>
+            <RootNavigator />
+          </ErrorBoundary>
         </NavigationContainer>
       </SafeAreaProvider>
     </GestureHandlerRootView>

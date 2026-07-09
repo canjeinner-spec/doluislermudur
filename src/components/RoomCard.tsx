@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { palette, posterGradients, shadow, spacing, typography } from '@/theme';
 import type { Room } from '@/data';
 import { AvatarStack } from './AvatarStack';
+import { GlassSurface } from './GlassSurface';
 import { Icon } from './icons';
 import { PlatformLogo } from './icons/PlatformLogo';
 import { PressableScale } from './PressableScale';
@@ -33,8 +34,9 @@ export function RoomCard({ room, onPress, onLongPress }: Props) {
       onLongPress={onLongPress}
       activeScale={0.98}
       accessibilityLabel={`${room.title}, ${room.participantCount} kişi`}
-      style={[styles.card, shadow.card]}
+      style={shadow.card}
     >
+      <GlassSurface borderRadius={24} intensity={26} style={styles.card}>
       {/* Thumbnail bleeds to the card's rounded left edge (card clips it). */}
       <View style={styles.thumb}>
         <LinearGradient
@@ -78,6 +80,7 @@ export function RoomCard({ room, onPress, onLongPress }: Props) {
           )}
         </View>
       </View>
+      </GlassSurface>
     </PressableScale>
   );
 }
@@ -86,11 +89,6 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     height: CARD_HEIGHT,
-    borderRadius: 24,
-    overflow: 'hidden',
-    backgroundColor: palette.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: palette.glassBorder,
     alignItems: 'stretch',
   },
   thumb: {

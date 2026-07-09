@@ -7,6 +7,7 @@ export interface RoomDraft {
 
 export type RootStackParamList = {
   Home: undefined;
+  Profile: undefined;
   CreateRoom: undefined;
   PlatformSelect: { draft: RoomDraft };
   WebViewLogin: { platformId: PlatformId; draft: RoomDraft };

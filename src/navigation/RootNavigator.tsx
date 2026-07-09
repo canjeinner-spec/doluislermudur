@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { palette } from '@/theme';
 import { HomeScreen } from '@/screens/HomeScreen';
+import { ProfileScreen } from '@/screens/ProfileScreen';
 import { CreateRoomScreen } from '@/screens/CreateRoomScreen';
 import { PlatformSelectScreen } from '@/screens/PlatformSelectScreen';
 import { WebViewLoginScreen } from '@/screens/WebViewLoginScreen';
@@ -28,6 +29,7 @@ export function RootNavigator() {
       }}
     >
       <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="CreateRoom" component={CreateRoomScreen} />
       <Stack.Screen name="PlatformSelect" component={PlatformSelectScreen} />
       <Stack.Screen name="WebViewLogin" component={WebViewLoginScreen} />

@@ -111,8 +111,8 @@ export function HomeScreen({ navigation }: Props) {
             icon="users"
             iconSize={24}
             variant="plain"
-            accessibilityLabel="Arkadaşlar"
-            onPress={() => setSheet('invite')}
+            accessibilityLabel="Profil"
+            onPress={() => navigation.navigate('Profile')}
           />
         }
       />
@@ -233,10 +233,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   brand: {
-    ...typography.headline,
+    ...typography.title3,
+    fontSize: 21,
     color: palette.textPrimary,
-    letterSpacing: 3,
-    fontWeight: '700',
+    letterSpacing: 3.5,
+    fontWeight: '800',
   },
   list: {
     paddingHorizontal: spacing.lg,

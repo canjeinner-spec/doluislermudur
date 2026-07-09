@@ -74,26 +74,16 @@ export function getPlatform(id: string): Platform | undefined {
   return PLATFORMS.find((p) => p.id === id);
 }
 
-/**
- * Providers that block playback on mobile browsers ("use the app"). For these
- * we spoof a desktop Safari UA so their web player loads and actually plays —
- * the same trick Rave-style apps use. The rest keep a normal mobile UA.
- */
-const DESKTOP_ONLY = new Set(['netflix', 'disney', 'prime', 'max', 'appletv']);
-
-const DESKTOP_UA =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15';
 const MOBILE_UA_IOS =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
 const MOBILE_UA_ANDROID =
   'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36';
 
-/** Pick the User-Agent a given provider should see. */
-export function userAgentFor(platformId: string, os: 'ios' | 'android' | string): string {
-  if (DESKTOP_ONLY.has(platformId)) return DESKTOP_UA;
+/**
+ * Present a normal mobile browser UA to every provider — this loads their mobile
+ * site, so sign-in pages render cleanly in the WebView (as in Turtle) rather
+ * than a giant desktop layout.
+ */
+export function userAgentFor(_platformId: string, os: 'ios' | 'android' | string): string {
   return os === 'android' ? MOBILE_UA_ANDROID : MOBILE_UA_IOS;
-}
-
-export function needsDesktop(platformId: string): boolean {
-  return DESKTOP_ONLY.has(platformId);
 }

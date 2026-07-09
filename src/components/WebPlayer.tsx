@@ -25,11 +25,26 @@ export type ControlEvent =
   | { type: 'pause' }
   | { type: 'seek'; time: number };
 
-/** Vimeo → clean embed; everything else (incl. YouTube) loads as-is. */
-function normalizeUrl(raw: string): string {
+type Source = { uri: string; headers?: Record<string, string> };
+
+/**
+ * YouTube / Vimeo → clean embed players (just the video, no site chrome).
+ * A youtube.com Referer avoids the "embed disabled" 153 error. Everything else
+ * (incl. DRM providers) loads its real page so login / browse works in-place.
+ */
+function normalizeSource(raw: string): Source {
+  const yt = raw.match(
+    /(?:youtube\.com\/(?:watch\?[^#]*\bv=|embed\/|shorts\/|v\/)|youtu\.be\/)([\w-]{11})/
+  );
+  if (yt) {
+    return {
+      uri: `https://www.youtube.com/embed/${yt[1]}?autoplay=1&playsinline=1&controls=0&rel=0&modestbranding=1&fs=0&iv_load_policy=3`,
+      headers: { Referer: 'https://www.youtube.com/' },
+    };
+  }
   const vimeo = raw.match(/vimeo\.com\/(?:video\/)?(\d+)/);
-  if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}?autoplay=1&playsinline=1`;
-  return raw;
+  if (vimeo) return { uri: `https://player.vimeo.com/video/${vimeo[1]}?autoplay=1&playsinline=1` };
+  return { uri: raw };
 }
 
 /**
@@ -63,7 +78,7 @@ const CONTROLLER = `
 
 export function WebPlayer({ uri, userAgent, onControl }: Props) {
   const webRef = useRef<WebView>(null);
-  const source = React.useMemo(() => normalizeUrl(uri), [uri]);
+  const source = React.useMemo(() => normalizeSource(uri), [uri]);
 
   const [playing, setPlaying] = useState(true);
   const [muted, setMuted] = useState(false);
@@ -168,7 +183,7 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
     <View style={styles.container}>
       <WebView
         ref={webRef}
-        source={{ uri: source }}
+        source={source}
         style={styles.web}
         injectedJavaScript={CONTROLLER}
         onMessage={onMessage}

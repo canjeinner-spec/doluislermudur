@@ -25,7 +25,6 @@ import {
   CURRENT_USER,
   ROOMS,
   getPlatform,
-  needsDesktop,
   userAgentFor,
   type Participant,
   type Room,
@@ -158,17 +157,14 @@ export function RoomScreen({ navigation, route }: Props) {
         </View>
       </View>
 
-      {/* Player: real WebView for non-DRM content, an honest notice for DRM
-          providers (which can't play in an Expo Go WebView), and the decorative
-          player for the sample rooms in the list. */}
+      {/* Player: real provider WebView for created rooms (login / browse / play
+          all happen here, like Turtle), decorative player for the sample rooms. */}
       <View style={styles.playerWrap}>
-        {route.params.contentUrl && !needsDesktop(room.platform) ? (
+        {route.params.contentUrl ? (
           <WebPlayer
             uri={route.params.contentUrl}
             userAgent={userAgentFor(room.platform, Platform.OS)}
           />
-        ) : route.params.contentUrl && needsDesktop(room.platform) ? (
-          <DrmNotice platformLabel={room.platformLabel} />
         ) : (
           <VideoPlayer posterIndex={room.posterIndex} />
         )}
@@ -252,50 +248,7 @@ export function RoomScreen({ navigation, route }: Props) {
   );
 }
 
-/**
- * Shown instead of a player for DRM providers. Their video is encrypted and
- * only a licensed CDM (the official app / a certified browser) can play it — an
- * embedded Expo Go WebView cannot. Honest placeholder rather than a broken page.
- */
-function DrmNotice({ platformLabel }: { platformLabel: string }) {
-  return (
-    <View style={styles.drm}>
-      <View style={styles.drmIcon}>
-        <Icon name="lock" size={26} color={palette.amber} />
-      </View>
-      <Text style={[typography.headline, styles.drmTitle]}>{platformLabel} korumalı içerik</Text>
-      <Text style={[typography.footnote, styles.drmBody]}>
-        {platformLabel} videoları DRM ile şifreli; gömülü oynatıcıda oynatılamaz. Bu, geliştirme
-        (dev) build gerektirir. DRM'siz kaynaklar (YouTube, Vimeo, doğrudan video) odada sorunsuz
-        oynar.
-      </Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  drm: {
-    aspectRatio: 16 / 9,
-    borderRadius: radius.lg,
-    backgroundColor: palette.surfaceSecondary,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: palette.glassBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-    gap: spacing.sm,
-  },
-  drmIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: palette.accentTintSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-  },
-  drmTitle: { color: palette.textPrimary, textAlign: 'center' },
-  drmBody: { color: palette.textSecondary, textAlign: 'center' },
   titleWrap: {
     alignItems: 'center',
     gap: 1,

@@ -91,9 +91,11 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
     );
   };
 
-  // scaleX from the left edge — numeric transform, no string-percentage layout.
+  // Numeric width off a measured track — no transformOrigin (which Fabric on
+  // Android can't cast) and no string-percentage animated layout.
+  const barW = useSharedValue(0);
   const barStyle = useAnimatedStyle(() => ({
-    transform: [{ scaleX: progress.value }],
+    width: progress.value * barW.value,
     opacity: progress.value > 0 && progress.value < 1 ? 1 : 0,
   }));
 
@@ -126,7 +128,12 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
         }
       />
 
-      <View style={styles.progressTrack}>
+      <View
+        style={styles.progressTrack}
+        onLayout={(e) => {
+          barW.value = e.nativeEvent.layout.width;
+        }}
+      >
         <Animated.View style={[styles.progressBar, barStyle]} />
       </View>
 
@@ -230,8 +237,6 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 2,
-    width: '100%',
-    transformOrigin: 'left',
     backgroundColor: palette.copper,
   },
   webWrap: {

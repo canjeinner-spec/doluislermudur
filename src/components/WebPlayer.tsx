@@ -25,52 +25,18 @@ export type ControlEvent =
   | { type: 'pause' }
   | { type: 'seek'; time: number };
 
-function extractYouTubeId(raw: string): string | null {
-  const m = raw.match(
-    /(?:youtube\.com\/(?:watch\?[^#]*\bv=|embed\/|shorts\/|v\/)|youtu\.be\/)([\w-]{11})/
-  );
-  return m ? m[1] : null;
-}
-
-/** Vimeo → clean embed; everything else loads as-is. */
-function toEmbedUrl(raw: string): string {
+/** Vimeo → clean embed; everything else (incl. YouTube) loads as-is. */
+function normalizeUrl(raw: string): string {
   const vimeo = raw.match(/vimeo\.com\/(?:video\/)?(\d+)/);
   if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}?autoplay=1&playsinline=1`;
   return raw;
 }
 
 /**
- * A local HTML page hosting the YouTube IFrame Player API. Loading it with a
- * real youtube.com baseUrl gives a valid referer/origin (fixes embed error 153)
- * and lets us drive playback through the official player API rather than a raw
- * <video> element — reliable play/pause/seek/mute and audible autoplay.
+ * Controller injected into the provider page: it finds the largest <video>
+ * element, unmutes and starts it once (autoplay policies begin muted), reports
+ * state back to React Native, and applies play / pause / seek / mute commands.
  */
-function youTubeHtml(id: string): string {
-  return `<!DOCTYPE html><html><head>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<style>*{margin:0;padding:0}html,body{height:100%;background:#000;overflow:hidden}#p{position:absolute;inset:0;width:100%;height:100%}</style>
-</head><body><div id="p"></div><script>
-var player,ready=false;
-function post(o){try{window.ReactNativeWebView.postMessage(JSON.stringify(o))}catch(e){}}
-function report(){if(!player||!ready)return;try{var st=player.getPlayerState();
-post({t:'state',has:true,time:player.getCurrentTime()||0,dur:player.getDuration()||0,paused:(st!==1&&st!==3),muted:!!(player.isMuted&&player.isMuted())});}catch(e){}}
-window.asteraCmd=function(c){if(!player||!ready)return;try{
-if(c.type==='play')player.playVideo();
-else if(c.type==='pause')player.pauseVideo();
-else if(c.type==='seek')player.seekTo(c.time,true);
-else if(c.type==='seekBy')player.seekTo(Math.max(0,(player.getCurrentTime()||0)+(c.delta||0)),true);
-else if(c.type==='mute'){if(c.value){player.mute()}else{player.unMute();player.setVolume(100)}}
-}catch(e){}setTimeout(report,80)};
-function onYouTubeIframeAPIReady(){player=new YT.Player('p',{videoId:'${id}',host:'https://www.youtube.com',
-playerVars:{autoplay:1,playsinline:1,controls:0,rel:0,modestbranding:1,fs:0,iv_load_policy:3,origin:'https://www.youtube.com'},
-events:{onReady:function(){ready=true;try{player.unMute();player.setVolume(100);player.playVideo()}catch(e){}post({t:'ready'})},
-onStateChange:function(){report()},onError:function(e){post({t:'error',code:e.data})}}})}
-var s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';document.body.appendChild(s);
-setInterval(report,800);
-</script></body></html>`;
-}
-
-/** Generic controller for same-origin <video> pages (Vimeo, direct video, …). */
 const CONTROLLER = `
 (function () {
   if (window.__astera) { return; } window.__astera = true;
@@ -84,29 +50,20 @@ const CONTROLLER = `
   }
   var inited=false;
   function report(){var v=findVideo();if(!v){post({t:'state',has:false});return;}
-    if(!inited){inited=true;try{v.muted=false;v.volume=1;v.play();}catch(e){}}
+    if(!inited){inited=true;try{v.muted=false;v.volume=1;var p=v.play();if(p&&p.catch)p.catch(function(){});}catch(e){}}
     post({t:'state',has:true,time:v.currentTime||0,dur:isFinite(v.duration)?v.duration:0,paused:!!v.paused,muted:!!v.muted});}
   window.__asteraApply=function(cmd){var v=findVideo();if(!v)return;try{
-    if(cmd.type==='play'){v.play();}else if(cmd.type==='pause'){v.pause();}
+    if(cmd.type==='play'){v.muted=false;v.play();}else if(cmd.type==='pause'){v.pause();}
     else if(cmd.type==='seek'){v.currentTime=cmd.time;}else if(cmd.type==='seekBy'){v.currentTime=Math.max(0,(v.currentTime||0)+cmd.delta);}
     else if(cmd.type==='mute'){v.muted=!!cmd.value;}}catch(e){}setTimeout(report,60);};
-  ['play','pause','seeked','ended','loadedmetadata'].forEach(function(ev){document.addEventListener(ev,report,true);});
+  ['play','pause','seeked','ended','loadedmetadata','canplay'].forEach(function(ev){document.addEventListener(ev,report,true);});
   setInterval(report,800);report();true;
 })();
 `;
 
-const YT_ERRORS: Record<number, string> = {
-  2: 'Geçersiz video',
-  5: 'Oynatıcı bu videoyu açamadı',
-  100: 'Video bulunamadı veya kaldırılmış',
-  101: 'Video sahibi gömülü oynatmayı kapatmış',
-  150: 'Video sahibi gömülü oynatmayı kapatmış',
-};
-
 export function WebPlayer({ uri, userAgent, onControl }: Props) {
   const webRef = useRef<WebView>(null);
-  const ytId = React.useMemo(() => extractYouTubeId(uri), [uri]);
-  const embedUri = React.useMemo(() => toEmbedUrl(uri), [uri]);
+  const source = React.useMemo(() => normalizeUrl(uri), [uri]);
 
   const [playing, setPlaying] = useState(true);
   const [muted, setMuted] = useState(false);
@@ -115,19 +72,14 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
   const [hasVideo, setHasVideo] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
   const [trackWidth, setTrackWidth] = useState(0);
-  const [error, setError] = useState<string | null>(null);
 
   const progress = useSharedValue(0);
   const trackW = useSharedValue(0);
   const knobScale = useSharedValue(1);
 
-  const apply = useCallback(
-    (cmd: object) => {
-      const fn = ytId ? 'window.asteraCmd' : 'window.__asteraApply';
-      webRef.current?.injectJavaScript(`${fn} && ${fn}(${JSON.stringify(cmd)}); true;`);
-    },
-    [ytId]
-  );
+  const apply = useCallback((cmd: object) => {
+    webRef.current?.injectJavaScript(`window.__asteraApply && window.__asteraApply(${JSON.stringify(cmd)}); true;`);
+  }, []);
 
   useEffect(() => {
     if (!scrubbing) progress.value = duration > 0 ? position / duration : 0;
@@ -137,11 +89,6 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
     (e: WebViewMessageEvent) => {
       try {
         const msg = JSON.parse(e.nativeEvent.data);
-        if (msg.t === 'error') {
-          setError(YT_ERRORS[msg.code as number] ?? 'Bu video oynatılamadı');
-          return;
-        }
-        if (msg.t === 'ready') setError(null);
         if (msg.t === 'state') {
           setHasVideo(!!msg.has);
           if (msg.has) {
@@ -221,9 +168,9 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
     <View style={styles.container}>
       <WebView
         ref={webRef}
-        source={ytId ? { html: youTubeHtml(ytId), baseUrl: 'https://www.youtube.com' } : { uri: embedUri }}
+        source={{ uri: source }}
         style={styles.web}
-        injectedJavaScript={ytId ? 'true;' : CONTROLLER}
+        injectedJavaScript={CONTROLLER}
         onMessage={onMessage}
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
@@ -241,15 +188,8 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
         allowsBackForwardNavigationGestures={false}
       />
 
-      {error && (
-        <View style={styles.errorWrap} pointerEvents="none">
-          <Icon name="info" size={22} color={palette.textSecondary} />
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
-
       {/* Controls float over the video; box-none lets touches reach the WebView
-          in the gaps so provider pages (login, etc.) stay interactive. */}
+          in the gaps so provider pages stay interactive. */}
       <View style={styles.overlay} pointerEvents="box-none">
         <View style={styles.topRow} pointerEvents="box-none">
           <View style={styles.livePill}>
@@ -272,7 +212,7 @@ export function WebPlayer({ uri, userAgent, onControl }: Props) {
         <View style={styles.bottom} pointerEvents="box-none">
           <View style={styles.timeRow}>
             <Text style={styles.time}>{fmt(position)}</Text>
-            {!hasVideo && !error && <Text style={styles.hint}>Yükleniyor…</Text>}
+            {!hasVideo && <Text style={styles.hint}>Yükleniyor…</Text>}
             <Text style={styles.time}>{duration > 0 ? fmt(duration) : '—:—'}</Text>
           </View>
           <GestureDetector gesture={scrub}>
@@ -330,14 +270,6 @@ const styles = StyleSheet.create({
     borderColor: palette.glassBorder,
   },
   web: { ...StyleSheet.absoluteFillObject, backgroundColor: palette.black },
-  errorWrap: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.xl,
-  },
-  errorText: { ...typography.subhead, color: palette.textSecondary, textAlign: 'center' },
   overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'space-between', padding: spacing.md },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   livePill: {

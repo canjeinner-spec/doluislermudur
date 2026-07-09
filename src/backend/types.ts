@@ -27,6 +27,7 @@ export type RoomRow = {
   host_id: string;
   is_public: boolean;
   status: 'watching' | 'waiting';
+  member_count: number; // maintained by trigger; the list sorts on this
   max_participants: number;
   created_at: string;
 };
@@ -36,6 +37,12 @@ export type RoomMemberRow = {
   user_id: string;
   role: 'host' | 'cohost' | 'member';
   joined_at: string;
+};
+
+export type RoomBanRow = {
+  room_id: string;
+  user_id: string;
+  banned_at: string;
 };
 
 export type MessageRow = {
@@ -74,9 +81,24 @@ export interface Database {
         Update: Partial<MessageRow>;
         Relationships: [];
       };
+      room_bans: {
+        Row: RoomBanRow;
+        Insert: Partial<RoomBanRow> & { room_id: string; user_id: string };
+        Update: Partial<RoomBanRow>;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      kick_member: {
+        Args: { p_room: string; p_user: string };
+        Returns: undefined;
+      };
+      invite_member: {
+        Args: { p_room: string; p_handle: string };
+        Returns: string;
+      };
+    };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
   };

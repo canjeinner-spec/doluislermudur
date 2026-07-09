@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { GestureResponderEvent, StyleProp, ViewStyle } from 'react-native';
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -66,14 +67,15 @@ export function PressableScale({
       opacity.value = withTiming(1, { duration: 140 });
     })
     .onEnd((_e, success) => {
-      if (success) press();
+      // Gesture callbacks run as worklets on the UI thread; hop back to JS.
+      if (success) runOnJS(press)();
     });
 
   const longPress = Gesture.LongPress()
     .enabled(!disabled && !!onLongPress)
     .minDuration(380)
     .onStart(() => {
-      long();
+      runOnJS(long)();
     });
 
   const gesture = Gesture.Exclusive(longPress, tap);

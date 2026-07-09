@@ -1,12 +1,12 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
-import { palette, radius, shadow, spacing, typography } from '@/theme';
+import { palette, posterGradients, shadow, spacing, typography } from '@/theme';
 import type { Room } from '@/data';
 import { AvatarStack } from './AvatarStack';
 import { Icon } from './icons';
 import { PlatformLogo } from './icons/PlatformLogo';
-import { Poster } from './Poster';
 import { PressableScale } from './PressableScale';
 
 type Props = {
@@ -15,12 +15,18 @@ type Props = {
   onLongPress?: () => void;
 };
 
+const CARD_HEIGHT = 88;
+const THUMB_WIDTH = 152;
+
 /**
- * Rave-style room card: a wide landscape thumbnail on the left with a platform
- * badge and live indicator, and the title + participant stack on the right.
+ * Rave-style room card: a pill-rounded row with an edge-to-edge landscape video
+ * thumbnail on the left (platform badge + play glyph) and the title + a stack of
+ * participant avatars on the right. No subtitle — clean, exactly like Rave.
  */
 export function RoomCard({ room, onPress, onLongPress }: Props) {
   const live = room.status === 'watching';
+  const colors = posterGradients[room.posterIndex % posterGradients.length];
+
   return (
     <PressableScale
       onPress={onPress}
@@ -29,20 +35,28 @@ export function RoomCard({ room, onPress, onLongPress }: Props) {
       accessibilityLabel={`${room.title}, ${room.participantCount} kişi`}
       style={[styles.card, shadow.card]}
     >
-      <View style={styles.thumbWrap}>
-        <Poster index={room.posterIndex} width={132} height={78} borderRadius={radius.md} />
+      {/* Thumbnail bleeds to the card's rounded left edge (card clips it). */}
+      <View style={styles.thumb}>
+        <LinearGradient
+          colors={colors}
+          start={{ x: 0.1, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.35)']}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.playGlyph}>
+          <Icon name="play" size={16} color="rgba(255,255,255,0.92)" filled />
+        </View>
         <View style={styles.platformBadge}>
-          <PlatformLogo id={room.platform} size={20} />
+          <PlatformLogo id={room.platform} size={22} />
         </View>
         {live && (
           <View style={styles.livePill}>
             <View style={styles.liveDot} />
             <Text style={styles.liveText}>CANLI</Text>
-          </View>
-        )}
-        {!room.isPublic && (
-          <View style={styles.lockBadge}>
-            <Icon name="lock" size={11} color={palette.white} strokeWidth={2.2} />
           </View>
         )}
       </View>
@@ -51,21 +65,17 @@ export function RoomCard({ room, onPress, onLongPress }: Props) {
         <Text style={[typography.subheadEmphasized, styles.title]} numberOfLines={2}>
           {room.title}
         </Text>
-        <Text style={[typography.caption1, styles.subtitle]} numberOfLines={1}>
-          {room.platformLabel} · {room.hostName}
-        </Text>
         <View style={styles.metaRow}>
           <AvatarStack
             participants={room.participants}
-            max={4}
-            size={24}
-            overflowCount={Math.max(0, room.participantCount - 4)}
+            max={5}
+            size={22}
+            overflowCount={Math.max(0, room.participantCount - 5)}
             ringColor={palette.surface}
           />
-          <View style={styles.count}>
-            <Icon name="users" size={12} color={palette.textTertiary} strokeWidth={2} />
-            <Text style={[typography.caption1, styles.countText]}>{room.participantCount}</Text>
-          </View>
+          {!room.isPublic && (
+            <Icon name="lock" size={12} color={palette.textTertiary} strokeWidth={2.2} />
+          )}
         </View>
       </View>
     </PressableScale>
@@ -75,31 +85,35 @@ export function RoomCard({ room, onPress, onLongPress }: Props) {
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
-    gap: spacing.md,
-    padding: spacing.sm + 2,
-    borderRadius: radius.lg,
+    height: CARD_HEIGHT,
+    borderRadius: 24,
+    overflow: 'hidden',
     backgroundColor: palette.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: palette.glassBorder,
-    alignItems: 'center',
+    alignItems: 'stretch',
   },
-  thumbWrap: {
-    width: 132,
-    height: 78,
-    borderRadius: radius.md,
+  thumb: {
+    width: THUMB_WIDTH,
+    height: CARD_HEIGHT,
     overflow: 'hidden',
+  },
+  playGlyph: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   platformBadge: {
     position: 'absolute',
-    top: 5,
-    right: 5,
-    borderRadius: 6,
+    top: 8,
+    right: 8,
+    borderRadius: 7,
     overflow: 'hidden',
   },
   livePill: {
     position: 'absolute',
-    bottom: 5,
-    left: 5,
+    bottom: 8,
+    left: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -116,41 +130,18 @@ const styles = StyleSheet.create({
     fontSize: 9,
     letterSpacing: 0.5,
   },
-  lockBadge: {
-    position: 'absolute',
-    top: 5,
-    left: 5,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   body: {
     flex: 1,
-    gap: 3,
-    paddingVertical: 2,
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
   },
   title: {
     color: palette.textPrimary,
-  },
-  subtitle: {
-    color: palette.textTertiary,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginTop: 2,
-  },
-  count: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  countText: {
-    color: palette.textTertiary,
-    fontWeight: '600',
   },
 });

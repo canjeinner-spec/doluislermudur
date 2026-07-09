@@ -71,14 +71,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   more: {
-    backgroundColor: palette.surfaceSecondary,
+    backgroundColor: palette.copper,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
     zIndex: 0,
   },
   moreText: {
-    color: palette.textSecondary,
-    fontWeight: '700',
+    color: palette.white,
+    fontWeight: '800',
   },
 });

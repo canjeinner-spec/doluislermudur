@@ -9,11 +9,9 @@ import Animated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { palette, radius, spacing, typography } from '@/theme';
+import { palette, posterGradients, radius, spacing, typography } from '@/theme';
 import { Icon } from './icons';
-import { IconButton } from './IconButton';
 import { PressableScale } from './PressableScale';
-import { Poster } from './Poster';
 
 type Props = {
   posterIndex: number;
@@ -132,9 +130,18 @@ export function VideoPlayer({ posterIndex, duration = 10090 }: Props) {
 
   return (
     <View style={[styles.container, fullscreen && styles.fullscreen]}>
-      <Poster index={posterIndex} width={9999} height={9999} borderRadius={radius.lg} style={StyleSheet.absoluteFill} />
+      {/* Poster background drawn inline (no fixed 9999 sizing / giant SVG). */}
       <LinearGradient
-        colors={['rgba(0,0,0,0.28)', 'transparent', 'rgba(0,0,0,0.55)']}
+        colors={posterGradients[posterIndex % posterGradients.length]}
+        start={{ x: 0.2, y: 0 }}
+        end={{ x: 0.9, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={styles.posterGlyph} pointerEvents="none">
+        <Icon name="film" size={64} color="rgba(255,255,255,0.12)" />
+      </View>
+      <LinearGradient
+        colors={['rgba(0,0,0,0.28)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.55)']}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
@@ -158,21 +165,16 @@ export function VideoPlayer({ posterIndex, duration = 10090 }: Props) {
             <Text style={styles.liveText}>CANLI</Text>
           </View>
           <View style={styles.topRight}>
-            <IconButton
+            <RoundControl
               icon="volume"
-              size={34}
-              iconSize={17}
-              variant="glass"
-              color={muted ? palette.textTertiary : palette.textPrimary}
-              accessibilityLabel={muted ? 'Sesi aç' : 'Sesi kapat'}
+              color={muted ? palette.textTertiary : palette.white}
+              label={muted ? 'Sesi aç' : 'Sesi kapat'}
               onPress={() => setMuted((m) => !m)}
             />
-            <IconButton
+            <RoundControl
               icon="fullscreen"
-              size={34}
-              iconSize={17}
-              variant="glass"
-              accessibilityLabel="Tam ekran"
+              color={palette.white}
+              label="Tam ekran"
               onPress={() => setFullscreen((f) => !f)}
             />
           </View>
@@ -214,6 +216,26 @@ export function VideoPlayer({ posterIndex, duration = 10090 }: Props) {
   );
 }
 
+function RoundControl({
+  icon,
+  onPress,
+  label,
+  color,
+}: {
+  icon: 'volume' | 'fullscreen';
+  onPress: () => void;
+  label: string;
+  color: string;
+}) {
+  return (
+    <PressableScale onPress={onPress} activeScale={0.88} accessibilityLabel={label}>
+      <View style={styles.roundControl}>
+        <Icon name={icon} size={17} color={color} />
+      </View>
+    </PressableScale>
+  );
+}
+
 function TransportButton({
   icon,
   onPress,
@@ -250,6 +272,21 @@ const styles = StyleSheet.create({
   fullscreen: {
     aspectRatio: undefined,
     minHeight: 260,
+  },
+  posterGlyph: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roundControl: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.14)',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,

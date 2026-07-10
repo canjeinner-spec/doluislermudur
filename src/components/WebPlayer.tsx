@@ -330,8 +330,11 @@ export function WebPlayer({ uri, userAgent, platform, fill, onToggleFullscreen, 
                 if (s === 'playing') {
                   setPlaying(true);
                   setHasVideo(true);
-                  // Bring the sound up once playback has actually begun.
-                  if (!didUnmute.current) {
+                  // Bring the sound up once playback has begun — iOS only. On
+                  // Android, auto-unmuting a programmatically-started video trips
+                  // the autoplay policy and PAUSES it, so we stay muted and let
+                  // the user tap "Ses" (a gesture) to unmute.
+                  if (!didUnmute.current && Platform.OS === 'ios') {
                     didUnmute.current = true;
                     setTimeout(() => setMuted(false), 350);
                   }

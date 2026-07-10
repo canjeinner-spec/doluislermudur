@@ -10,6 +10,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import {
+  AuthGateModal,
   BottomSheet,
   Icon,
   IconButton,
@@ -20,7 +21,7 @@ import {
   TextField,
 } from '@/components';
 import { ROOMS } from '@/data';
-import { isBackendConfigured, useRooms } from '@/backend';
+import { isBackendConfigured, useAuth, useRooms } from '@/backend';
 import { accentGradient, palette, shadow, spacing, typography } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 import {
@@ -49,6 +50,13 @@ export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [sheet, setSheet] = useState<SheetKey | null>(null);
+  const [authGate, setAuthGate] = useState(false);
+
+  const { isAnonymous } = useAuth();
+  const createRoom = () => {
+    if (isBackendConfigured && isAnonymous) setAuthGate(true);
+    else navigation.navigate('CreateRoom');
+  };
 
   const { rooms: liveRooms, refresh } = useRooms();
   const source = isBackendConfigured ? liveRooms : ROOMS;
@@ -156,7 +164,7 @@ export function HomeScreen({ navigation }: Props) {
       {/* Round create FAB, bottom-right (Rave-style). */}
       <View style={[styles.fabWrap, { paddingBottom: insets.bottom + spacing.lg }]} pointerEvents="box-none">
         <PressableScale
-          onPress={() => navigation.navigate('CreateRoom')}
+          onPress={createRoom}
           activeScale={0.9}
           accessibilityLabel="Oda oluştur"
           style={[styles.fab, shadow.accentGlow]}
@@ -184,6 +192,14 @@ export function HomeScreen({ navigation }: Props) {
         {sheet === 'settings' && <SettingsSheet />}
         {sheet === 'about' && <AboutSheet />}
       </BottomSheet>
+
+      <AuthGateModal
+        visible={authGate}
+        onClose={() => setAuthGate(false)}
+        onLogin={() => { setAuthGate(false); navigation.navigate('Login'); }}
+        title="Oda oluşturmak için giriş yap"
+        message="Oda kurmak ve etkileşmek için bir hesabın olmalı. Giriş yapmadan mevcut odaları izleyebilirsin."
+      />
     </ScreenBackground>
   );
 }

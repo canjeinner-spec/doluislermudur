@@ -1,6 +1,14 @@
 export { supabase } from './supabase';
 export { isBackendConfigured } from './config';
-export { ensureSession, updateDisplayName, fetchMyProfile } from './auth';
+export {
+  ensureSession,
+  updateDisplayName,
+  fetchMyProfile,
+  emailExists,
+  signIn,
+  register,
+  setHandle,
+} from './auth';
 export {
   createRoom,
   joinRoom,
@@ -17,7 +25,7 @@ export {
   toRoom,
 } from './rooms';
 export type { MessageWithAuthor } from './rooms';
-export { useRooms, useRoomSession, useMyProfile, useMyId } from './hooks';
+export { useRooms, useRoomSession, useMyProfile, useMyId, useAuth } from './hooks';
 export type { RoomSession } from './hooks';
 export type {
   AuthedUser,

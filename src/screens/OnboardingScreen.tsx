@@ -45,6 +45,11 @@ export function OnboardingScreen({ navigation }: Props) {
     navigation.replace('Home');
   };
 
+  const login = () => {
+    storage.setBool(StorageKeys.onboardingDone, true);
+    navigation.replace('Login');
+  };
+
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
@@ -81,7 +86,7 @@ export function OnboardingScreen({ navigation }: Props) {
           </LinearGradient>
         </PressableScale>
 
-        <PressableScale onPress={enter} activeScale={0.97} accessibilityLabel="Giriş Yap">
+        <PressableScale onPress={login} activeScale={0.97} accessibilityLabel="Giriş Yap">
           <View style={styles.secondaryBtn}>
             <Text style={[typography.headline, styles.secondaryText]}>Giriş Yap</Text>
           </View>

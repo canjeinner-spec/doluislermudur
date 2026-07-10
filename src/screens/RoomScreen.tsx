@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import {
+  AuthGateModal,
   BottomSheet,
   Icon,
   IconButton,
@@ -29,7 +30,7 @@ import {
   type Participant,
   type Room,
 } from '@/data';
-import { isBackendConfigured, kickMember, useMyId, useRoomSession } from '@/backend';
+import { isBackendConfigured, kickMember, useAuth, useMyId, useRoomSession } from '@/backend';
 import { palette, radius, spacing, typography } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 import { InviteFriendsSheet } from './sheets';
@@ -115,6 +116,10 @@ export function RoomScreen({ navigation, route }: Props) {
   const [usersOpen, setUsersOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [chatTop, setChatTop] = useState(0);
+  const [authGate, setAuthGate] = useState(false);
+
+  const { isAnonymous } = useAuth();
+  const canInteract = !isBackendConfigured || !isAnonymous;
 
   const usersProgress = useSharedValue(0);
   const openUsers = () => {
@@ -222,6 +227,8 @@ export function RoomScreen({ navigation, route }: Props) {
             myId={myId}
             participants={participants}
             ready={!session.loading}
+            canInteract={canInteract}
+            onRequireAuth={() => setAuthGate(true)}
           />
         </View>
       )}
@@ -267,6 +274,12 @@ export function RoomScreen({ navigation, route }: Props) {
       <BottomSheet visible={inviteOpen} onClose={() => setInviteOpen(false)} title="Arkadaş Davet Et" height={0.7}>
         <InviteFriendsSheet roomName={room.title} roomId={backendRoomId} />
       </BottomSheet>
+
+      <AuthGateModal
+        visible={authGate}
+        onClose={() => setAuthGate(false)}
+        onLogin={() => { setAuthGate(false); navigation.navigate('Login'); }}
+      />
     </ScreenBackground>
   );
 }

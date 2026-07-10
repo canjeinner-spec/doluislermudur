@@ -48,6 +48,33 @@ export function useRooms(): { rooms: Room[]; loading: boolean; refresh: () => vo
   return { rooms, loading, refresh };
 }
 
+/** Current auth identity + whether it's an anonymous ("Başlayalım") user. */
+export function useAuth(): { userId: string | null; isAnonymous: boolean; loading: boolean } {
+  const [state, setState] = useState<{ userId: string | null; isAnonymous: boolean }>({
+    userId: null,
+    isAnonymous: true,
+  });
+  const [loading, setLoading] = useState(isBackendConfigured);
+
+  useEffect(() => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+    const client = supabase;
+    const apply = (u: { id: string; is_anonymous?: boolean } | null) =>
+      setState({ userId: u?.id ?? null, isAnonymous: u?.is_anonymous ?? true });
+    client.auth.getUser().then(({ data }) => {
+      apply(data.user);
+      setLoading(false);
+    });
+    const { data: sub } = client.auth.onAuthStateChange((_e, session) => apply(session?.user ?? null));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  return { ...state, loading };
+}
+
 /** The signed-in user's id (null until resolved / when backend is off). */
 export function useMyId(): string | null {
   const [id, setId] = useState<string | null>(null);

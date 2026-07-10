@@ -15,6 +15,7 @@ export type ProfileRow = {
   minutes_watched: number;
   rooms_hosted: number;
   created_at: string;
+  handle_updated_at: string | null;
 };
 
 export type RoomRow = {
@@ -96,6 +97,14 @@ export interface Database {
       };
       invite_member: {
         Args: { p_room: string; p_handle: string };
+        Returns: string;
+      };
+      email_exists: {
+        Args: { p_email: string };
+        Returns: boolean;
+      };
+      set_handle: {
+        Args: { p_handle: string };
         Returns: string;
       };
     };

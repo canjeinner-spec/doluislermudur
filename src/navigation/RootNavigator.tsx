@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { palette } from '@/theme';
 import { storage, StorageKeys } from '@/storage/storage';
 import { OnboardingScreen } from '@/screens/OnboardingScreen';
+import { LoginScreen } from '@/screens/LoginScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { CreateRoomScreen } from '@/screens/CreateRoomScreen';
@@ -38,6 +39,7 @@ export function RootNavigator() {
         component={OnboardingScreen}
         options={{ animation: 'fade', gestureEnabled: false }}
       />
+      <Stack.Screen name="Login" component={LoginScreen} options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="CreateRoom" component={CreateRoomScreen} />

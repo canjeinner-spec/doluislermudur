@@ -36,6 +36,9 @@ type Props = {
   participants?: Participant[];
   /** Only load history once we've actually joined (RLS needs membership). */
   ready?: boolean;
+  /** Anonymous users can watch but not chat — false shows the auth gate. */
+  canInteract?: boolean;
+  onRequireAuth?: () => void;
 };
 
 function fmtTime(iso: string): string {
@@ -88,6 +91,8 @@ export function ChatView({
   myId,
   participants,
   ready = true,
+  canInteract = true,
+  onRequireAuth,
 }: Props) {
   const backend = isBackendConfigured && !!roomId;
   const [messages, setMessages] = useState<ChatMessage[]>(backend ? [] : CHAT_SEED);
@@ -117,6 +122,10 @@ export function ChatView({
   }, [backend, roomId, myId, ready]);
 
   const send = useCallback(() => {
+    if (!canInteract) {
+      onRequireAuth?.();
+      return;
+    }
     const text = draft.trim();
     if (!text) return;
     setDraft('');
@@ -140,7 +149,7 @@ export function ChatView({
       mine: true,
     };
     setMessages((prev) => [...prev, msg]);
-  }, [draft, backend, roomId, myId, participants]);
+  }, [draft, backend, roomId, myId, participants, canInteract, onRequireAuth]);
 
   // Inverted list wants newest first; precompute grouping in chronological order.
   const data = useMemo<Row[]>(() => {
@@ -201,27 +210,38 @@ export function ChatView({
       />
 
       <View style={[styles.composer, { paddingBottom: bottomInset + spacing.sm }]}>
-        <View style={styles.inputPill}>
-          <TextInput
-            style={[typography.body, styles.input]}
-            value={draft}
-            onChangeText={setDraft}
-            placeholder="Mesaj yaz…"
-            placeholderTextColor={palette.textTertiary}
-            selectionColor={palette.amber}
-            cursorColor={palette.amber}
-            keyboardAppearance="dark"
-            multiline
-            onSubmitEditing={send}
-            blurOnSubmit={false}
-            returnKeyType="send"
-          />
-        </View>
-        <PressableScale onPress={send} activeScale={0.88} disabled={!draft.trim()} accessibilityLabel="Gönder">
-          <View style={[styles.send, !draft.trim() && styles.sendDisabled]}>
-            <SendArrow />
-          </View>
-        </PressableScale>
+        {canInteract ? (
+          <>
+            <View style={styles.inputPill}>
+              <TextInput
+                style={[typography.body, styles.input]}
+                value={draft}
+                onChangeText={setDraft}
+                placeholder="Mesaj yaz…"
+                placeholderTextColor={palette.textTertiary}
+                selectionColor={palette.amber}
+                cursorColor={palette.amber}
+                keyboardAppearance="dark"
+                multiline
+                onSubmitEditing={send}
+                blurOnSubmit={false}
+                returnKeyType="send"
+              />
+            </View>
+            <PressableScale onPress={send} activeScale={0.88} disabled={!draft.trim()} accessibilityLabel="Gönder">
+              <View style={[styles.send, !draft.trim() && styles.sendDisabled]}>
+                <SendArrow />
+              </View>
+            </PressableScale>
+          </>
+        ) : (
+          <PressableScale onPress={onRequireAuth} activeScale={0.98} style={styles.lockedWrap} accessibilityLabel="Sohbet için giriş yap">
+            <View style={styles.lockedPill}>
+              <Icon name="lock" size={15} color={palette.textTertiary} strokeWidth={2} />
+              <Text style={styles.lockedText}>Sohbet etmek için giriş yap</Text>
+            </View>
+          </PressableScale>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -348,4 +368,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendDisabled: { backgroundColor: palette.surfaceElevated, opacity: 0.6 },
+  lockedWrap: { flex: 1 },
+  lockedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    minHeight: 44,
+    borderRadius: radius.xl,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: palette.glassBorder,
+  },
+  lockedText: { ...typography.subhead, color: palette.textTertiary },
 });

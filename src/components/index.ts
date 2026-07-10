@@ -10,6 +10,7 @@ export type { Segment } from './SegmentedControl';
 export { ScreenBackground } from './ScreenBackground';
 export { Poster } from './Poster';
 export { TextField } from './TextField';
+export { AuthGateModal } from './AuthGateModal';
 export { SectionHeader } from './SectionHeader';
 export { ListRow } from './ListRow';
 export { NavBar } from './NavBar';

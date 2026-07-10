@@ -269,9 +269,34 @@ export function ChatView({
         pointerEvents="none"
       />
 
+      {/* Now-playing + invite: pinned directly under the player (doesn't scroll). */}
+      <View style={styles.pinnedHeader}>
+        <View style={styles.systemRow}>
+          <Icon name="sparkle" size={14} color={palette.amber} filled />
+          <Text style={styles.systemText}>
+            Şimdi <Text style={styles.systemStrong}>{nowPlaying}</Text> oynatılıyor
+          </Text>
+          {onChangeContent && (
+            <PressableScale onPress={onChangeContent} activeScale={0.9} accessibilityLabel="İçeriği değiştir">
+              <View style={styles.changeBtn}>
+                <Icon name="repeat" size={13} color={palette.amberBright} strokeWidth={2.2} />
+                <Text style={styles.changeText}>Değiştir</Text>
+              </View>
+            </PressableScale>
+          )}
+        </View>
+        <View style={styles.systemRow}>
+          <Icon name="share" size={13} color={palette.textTertiary} />
+          <Text style={styles.inviteText}>
+            Davet linki: <Text style={styles.inviteLink}>astera.app/join/{inviteCode}</Text>
+          </Text>
+        </View>
+      </View>
+
       <FlatList
         data={data}
         inverted
+        style={styles.listFlex}
         keyExtractor={(r) => r.message.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
@@ -282,30 +307,6 @@ export function ChatView({
           ) : (
             <MessageRow message={item.message} grouped={item.grouped} />
           )
-        }
-        ListFooterComponent={
-          <View style={styles.header}>
-            <View style={styles.systemRow}>
-              <Icon name="sparkle" size={14} color={palette.amber} filled />
-              <Text style={styles.systemText}>
-                Şimdi <Text style={styles.systemStrong}>{nowPlaying}</Text> oynatılıyor
-              </Text>
-              {onChangeContent && (
-                <PressableScale onPress={onChangeContent} activeScale={0.9} accessibilityLabel="İçeriği değiştir">
-                  <View style={styles.changeBtn}>
-                    <Icon name="repeat" size={13} color={palette.amberBright} strokeWidth={2.2} />
-                    <Text style={styles.changeText}>Değiştir</Text>
-                  </View>
-                </PressableScale>
-              )}
-            </View>
-            <View style={styles.systemRow}>
-              <Icon name="share" size={13} color={palette.textTertiary} />
-              <Text style={styles.inviteText}>
-                Davet linki: <Text style={styles.inviteLink}>astera.app/join/{inviteCode}</Text>
-              </Text>
-            </View>
-          </View>
         }
       />
 
@@ -356,13 +357,15 @@ const SYS_LABEL: Record<'join' | 'leave' | 'kick', string> = {
   kick: 'atıldı',
 };
 
-/** Ephemeral presence line: "{name} katıldı / ayrıldı / atıldı" with the avatar.
- *  Your own join reads "Odaya katıldın" as a confirmation. */
+/** Ephemeral presence line, rendered like an *incoming* message (avatar left) so
+ *  it reads as the system announcing "{name} katıldı / ayrıldı / atıldı" — not as
+ *  something you typed. Your own join reads "Odaya katıldın" as a confirmation. */
 function SystemNotice({ message, myId }: { message: ChatMessage; myId?: string | null }) {
   const kind = message.system ?? 'join';
   const isSelfJoin = kind === 'join' && !!myId && message.authorId === myId;
   return (
     <Animated.View entering={FadeIn.duration(160)} style={styles.systemNoticeRow}>
+      <Avatar name={message.authorName} tint={message.tint} size={SYS_AVATAR} imageUrl={message.avatarUrl} />
       <Text style={styles.systemNoticeText} numberOfLines={1}>
         {isSelfJoin ? (
           <Text style={styles.systemNoticeName}>Odaya katıldın</Text>
@@ -373,7 +376,6 @@ function SystemNotice({ message, myId }: { message: ChatMessage; myId?: string |
           </>
         )}
       </Text>
-      <Avatar name={message.authorName} tint={message.tint} size={SYS_AVATAR} imageUrl={message.avatarUrl} />
     </Animated.View>
   );
 }
@@ -409,16 +411,18 @@ function MessageRow({ message, grouped }: { message: ChatMessage; grouped: boole
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  listFlex: { flex: 1 },
   list: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
     gap: spacing.md,
   },
-  header: {
-    gap: spacing.md,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
+  pinnedHeader: {
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
   },
   systemRow: {
     flexDirection: 'row',
@@ -449,11 +453,10 @@ const styles = StyleSheet.create({
   systemNoticeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
     gap: spacing.sm,
-    paddingLeft: 40,
+    paddingRight: 44,
   },
-  systemNoticeText: { ...typography.footnote, color: palette.textSecondary, flexShrink: 1, textAlign: 'right' },
+  systemNoticeText: { ...typography.footnote, color: palette.textSecondary, flexShrink: 1 },
   systemNoticeName: { color: palette.textPrimary, fontWeight: '800' },
   systemNoticeKick: { color: palette.danger, fontWeight: '700' },
   otherText: { flex: 1, color: palette.textPrimary, fontSize: 16, lineHeight: 22, paddingTop: 6 },

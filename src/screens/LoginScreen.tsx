@@ -6,15 +6,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Icon, IconButton, NavBar, PressableScale, ScreenBackground, TextField } from '@/components';
-import { emailExists, register, signIn } from '@/backend';
+import { checkEmailPolicy, emailExists, register, signIn } from '@/backend';
 import { accentGradient, palette, radius, spacing, typography } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 type Step = 'email' | 'password' | 'register';
-
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export function LoginScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
@@ -39,8 +37,9 @@ export function LoginScreen({ navigation, route }: Props) {
 
   const checkEmail = async () => {
     setError(null);
-    if (!EMAIL_RE.test(email.trim())) {
-      setError('Geçerli bir e-posta gir');
+    const policy = checkEmailPolicy(email);
+    if (!policy.ok) {
+      setError(policy.reason ?? 'Geçerli bir e-posta gir');
       return;
     }
     setBusy(true);

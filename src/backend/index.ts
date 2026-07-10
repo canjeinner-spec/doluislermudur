@@ -1,5 +1,6 @@
 export { supabase } from './supabase';
 export { isBackendConfigured } from './config';
+export { checkEmailPolicy, ALLOWED_EMAIL_DOMAINS } from './emailPolicy';
 export {
   ensureSession,
   updateDisplayName,

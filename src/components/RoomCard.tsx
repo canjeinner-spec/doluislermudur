@@ -115,8 +115,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    borderRadius: 7,
+    padding: 5,
+    borderRadius: 9,
     overflow: 'hidden',
+    // Keep the now-transparent logo legible over bright thumbnails.
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
   livePill: {
     position: 'absolute',

@@ -202,9 +202,11 @@ export function WebPlayer({ uri, userAgent, platform, fill, onToggleFullscreen, 
     didUnmute.current = true;
     if (!ytId) applyWeb({ type: 'mute', value: next });
     else if (Platform.OS === 'android' && !next) {
-      // Unmuting can freeze the video surface on Android; a tiny re-seek forces
-      // the surface to refresh and keeps playback going.
-      setTimeout(() => ytRef.current?.seekTo(Math.max(0, position), true), 150);
+      // The video started via muted autoplay (no gesture). Unmuting revokes that
+      // grant and Android pauses it (looks "frozen"). This tap IS a gesture, so
+      // re-assert play right after unmuting to resume — now with sound.
+      setPlaying(false);
+      setTimeout(() => setPlaying(true), 60);
     }
     showControls();
   };

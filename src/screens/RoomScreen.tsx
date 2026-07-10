@@ -8,6 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import {
@@ -154,6 +155,10 @@ export function RoomScreen({ navigation, route }: Props) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [usersOpen, setUsersOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  // Bumped after a login-only trip so the player remounts and its WebView reloads
+  // with the now-authenticated session (co-watching: the viewer's own copy).
+  const [reloadTick, setReloadTick] = useState(0);
+  const pendingReloadRef = useRef(false);
   const [chatTop, setChatTop] = useState(0);
   const [authGate, setAuthGate] = useState(false);
 
@@ -203,6 +208,26 @@ export function RoomScreen({ navigation, route }: Props) {
       roomId: backendRoomId,
     });
 
+  // Viewer isn't signed in to the provider → open that provider's login. On
+  // return we reload the player so their session plays their own copy.
+  const openProviderLogin = () => {
+    pendingReloadRef.current = true;
+    navigation.navigate('WebViewLogin', {
+      platformId: room.platform,
+      draft: { isPublic: room.isPublic },
+      loginOnly: true,
+    });
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      if (pendingReloadRef.current) {
+        pendingReloadRef.current = false;
+        setReloadTick((t) => t + 1);
+      }
+    }, [])
+  );
+
   return (
     <ScreenBackground glow="none">
       {/* Top bar — X · ASTERA · (change) invite + participants. Bare icons, no
@@ -228,7 +253,7 @@ export function RoomScreen({ navigation, route }: Props) {
         {contentUrl ? (
           <WebPlayer
             ref={playerRef}
-            key={contentUrl}
+            key={`${contentUrl}:${reloadTick}`}
             uri={contentUrl}
             platform={room.platform}
             userAgent={userAgentFor(room.platform, Platform.OS)}
@@ -237,6 +262,7 @@ export function RoomScreen({ navigation, route }: Props) {
             onToggleFullscreen={toggleFullscreen}
             onControl={sync.broadcastControl}
             canControl={isHost}
+            onRequireProviderLogin={openProviderLogin}
           />
         ) : session.loading ? (
           <View style={styles.playerLoading}>

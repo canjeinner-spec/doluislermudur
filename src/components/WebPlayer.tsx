@@ -29,6 +29,10 @@ type Props = {
   /** When false (non-host followers), playback controls are read-only — the
    *  overlay shows time/progress but can't drive play/pause/seek. */
   canControl?: boolean;
+  /** Fired when the embed shows a provider sign-in gate — the room offers an
+   *  "Oturum aç" button that opens the provider's login (co-watching: each
+   *  viewer streams their own copy). */
+  onRequireProviderLogin?: () => void;
 };
 
 export type ControlEvent =
@@ -146,7 +150,7 @@ export type WebPlayerHandle = {
 };
 
 export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
-  { uri, userAgent, platform, fill, onToggleFullscreen, fullscreen, onControl, canControl = true },
+  { uri, userAgent, platform, fill, onToggleFullscreen, fullscreen, onControl, canControl = true, onRequireProviderLogin },
   ref
 ) {
   const webRef = useRef<WebView>(null);
@@ -426,12 +430,23 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
         />
       )}
 
-      {/* A provider sign-in gate is showing inside the embed — step aside so the
-          user can log in on the page itself, with just a hint at the top. */}
+      {/* Provider sign-in gate inside the embed. Co-watching: each viewer needs
+          their own session, so we offer a clean "Oturum aç" button that opens
+          the provider's login instead of leaving a raw web page in the player. */}
       {signin && !ytId && (
-        <View style={styles.signinHint} pointerEvents="none">
-          <Icon name="lock" size={13} color={palette.white} strokeWidth={2} />
-          <Text style={styles.signinText}>Bu cihazda hesabınızla giriş yapın</Text>
+        <View style={styles.signinCover}>
+          <View style={styles.signinCard}>
+            <Icon name="lock" size={22} color={palette.amber} strokeWidth={2} />
+            <Text style={styles.signinTitle}>Bu içeriği izlemek için giriş yap</Text>
+            <Text style={styles.signinSub}>Kendi hesabınla oturum aç; herkes kendi kopyasını izler, biz senkronu sağlarız.</Text>
+            {onRequireProviderLogin && (
+              <PressableScale onPress={onRequireProviderLogin} activeScale={0.96} accessibilityLabel="Oturum aç">
+                <View style={styles.signinBtn}>
+                  <Text style={styles.signinBtnText}>Oturum aç</Text>
+                </View>
+              </PressableScale>
+            )}
+          </View>
         </View>
       )}
 
@@ -596,20 +611,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   hostBadgeText: { ...typography.caption1, color: palette.white, fontWeight: '600' },
-  signinHint: {
-    position: 'absolute',
-    top: spacing.md,
-    alignSelf: 'center',
-    flexDirection: 'row',
+  signinCover: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.md,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    padding: spacing.lg,
+    backgroundColor: 'rgba(9,9,9,0.86)',
     zIndex: 5,
   },
-  signinText: { ...typography.caption1, color: palette.white, fontWeight: '600' },
+  signinCard: { alignItems: 'center', gap: spacing.sm, maxWidth: 360 },
+  signinTitle: { ...typography.headline, color: palette.white, fontWeight: '700', textAlign: 'center', marginTop: 2 },
+  signinSub: { ...typography.footnote, color: palette.textTertiary, textAlign: 'center' },
+  signinBtn: {
+    marginTop: spacing.sm,
+    height: 46,
+    paddingHorizontal: spacing.xxl,
+    borderRadius: radius.lg,
+    backgroundColor: palette.copper,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signinBtnText: { ...typography.headline, color: palette.white, fontWeight: '700' },
   bottom: { gap: spacing.xs },
   timeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   time: {

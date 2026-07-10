@@ -9,9 +9,11 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { Icon, IconButton, NavBar, ScreenBackground } from '@/components';
+import { LinearGradient } from 'expo-linear-gradient';
+
+import { Icon, IconButton, NavBar, PressableScale, ScreenBackground } from '@/components';
 import { getPlatform, userAgentFor } from '@/data';
-import { palette, spacing, typography } from '@/theme';
+import { accentGradient, palette, radius, spacing, typography } from '@/theme';
 import { storage, StorageKeys } from '@/storage/storage';
 import { createRoom, isBackendConfigured, updateRoomContent } from '@/backend';
 import type { RootStackParamList } from '@/navigation/types';
@@ -105,6 +107,10 @@ async function youtubeTitle(url: string): Promise<string | null> {
 export function WebViewLoginScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { platformId, draft } = route.params;
+  // Login-only: a room viewer signing in to their own account. We don't capture
+  // content or create a room — the user just logs in and taps "Girişi Tamamla"
+  // to go back, where their now-authenticated session plays their own copy.
+  const loginOnly = !!route.params.loginOnly;
   const platform = getPlatform(platformId);
   const webRef = useRef<WebView>(null);
 
@@ -186,7 +192,7 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
       if (msg.t === 'meta') {
         if (typeof msg.image === 'string' && msg.image) ogImageRef.current = msg.image;
         if (typeof msg.title === 'string' && msg.title) ogTitleRef.current = msg.title;
-      } else if (msg.t === 'playing' && typeof msg.url === 'string') {
+      } else if (msg.t === 'playing' && typeof msg.url === 'string' && !loginOnly) {
         finish(msg.url, msg.title);
       }
     } catch {
@@ -209,7 +215,7 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
     // is platform-independent — it does not depend on Android actually starting
     // playback (the probe is a secondary, event-based trigger).
     const path = (pathname + search).toLowerCase();
-    if (!nav.loading && PLAYBACK_HINTS.some((h) => path.includes(h))) {
+    if (!loginOnly && !nav.loading && PLAYBACK_HINTS.some((h) => path.includes(h))) {
       finish(nav.url, nav.title);
     }
   };
@@ -312,6 +318,15 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
         )}
       </View>
 
+      {/* Login-only: the viewer signs in, then confirms to return to the room. */}
+      {loginOnly && (
+        <PressableScale onPress={() => navigation.goBack()} activeScale={0.97} accessibilityLabel="Girişi tamamla" style={styles.doneWrap}>
+          <LinearGradient colors={accentGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.done}>
+            <Text style={[typography.headline, styles.doneText]}>Girişi tamamla → odaya dön</Text>
+          </LinearGradient>
+        </PressableScale>
+      )}
+
       {/* Browser toolbar */}
       <View style={[styles.toolbar, { paddingBottom: insets.bottom + spacing.xs }]}>
         <IconButton
@@ -399,4 +414,11 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: palette.separator,
   },
+  doneWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    backgroundColor: palette.background,
+  },
+  done: { height: 52, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+  doneText: { color: palette.white, fontWeight: '700' },
 });

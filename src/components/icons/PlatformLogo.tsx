@@ -65,30 +65,29 @@ export function PlatformLogo({ id, size = 44 }: Props) {
     case 'max':
       return <MaxMark size={size} />;
     case 'prime':
-      // Prime Video signature: cyan play glyph over the smile swoosh.
+      // Prime Video: bold cyan play glyph above the Amazon "smile" swoosh.
       return (
         <Svg width={size} height={size} viewBox="0 0 100 100">
-          <Circle cx="50" cy="42" r="24" fill="none" stroke="#1FA9E6" strokeWidth="7" />
-          <Polygon points="43,31 43,53 63,42" fill="#1FA9E6" />
+          <Polygon points="39,26 39,56 66,41" fill="#1FA9E6" />
           <Path
-            d="M20 68c12 12 48 12 60 0"
+            d="M15 66c15 13 55 13 70 0"
             stroke="#1FA9E6"
-            strokeWidth="7"
+            strokeWidth="8"
             strokeLinecap="round"
             fill="none"
           />
-          <Path d="M74 62l10 3-4 10Z" fill="#1FA9E6" />
+          <Path d="M77 59l11 3-4 11Z" fill="#1FA9E6" />
         </Svg>
       );
     case 'disney':
-      // Disney+ style: rounded "D" with a plus.
+      // Disney+ style: rounded "D" with the signature plus, brand blue.
       return (
         <Svg width={size} height={size} viewBox="0 0 100 100">
           <Path
-            d="M24 26h20c15 0 26 10 26 24S59 74 44 74H24V26Zm12 11v26h8c8 0 14-5 14-13s-6-13-14-13h-8Z"
+            d="M22 24h22c16.5 0 28 11 28 26S60.5 76 44 76H22V24Zm13 12.5v27h9c9 0 15.5-6 15.5-13.5S53 36.5 44 36.5h-9Z"
             fill="#1AA0E8"
           />
-          <Path d="M78 40v18M69 49h18" stroke="#1AA0E8" strokeWidth="6" strokeLinecap="round" />
+          <Path d="M82 37v20M72 47h20" stroke="#1AA0E8" strokeWidth="6.5" strokeLinecap="round" />
         </Svg>
       );
     case 'gdrive':

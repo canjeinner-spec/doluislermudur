@@ -25,7 +25,9 @@ export function LoginScreen({ navigation }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const done = () => navigation.replace('Home');
+  // Reset the stack to a single Home so we never end up with two Home screens
+  // (each opening the same realtime channel and colliding).
+  const done = () => navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
 
   const checkEmail = async () => {
     setError(null);

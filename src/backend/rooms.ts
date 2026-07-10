@@ -208,11 +208,15 @@ export async function inviteByHandle(roomId: string, handle: string): Promise<st
 
 // ── Realtime subscriptions (Postgres changes) ────────────────────────────────
 
+// Unique suffix so two mounts (or a stale + fresh screen) never reuse the same
+// channel topic — Supabase rejects adding listeners to an already-subscribed one.
+const rand = () => Math.random().toString(36).slice(2, 9);
+
 export function subscribeRooms(onChange: () => void): () => void {
   if (!supabase) return () => {};
   const client = supabase;
   const ch = client
-    .channel('rooms-list')
+    .channel(`rooms-list-${rand()}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, onChange)
     .subscribe();
   return () => {
@@ -224,7 +228,7 @@ export function subscribeRoom(roomId: string, onChange: () => void): () => void 
   if (!supabase) return () => {};
   const client = supabase;
   const ch = client
-    .channel(`room-${roomId}`)
+    .channel(`room-${roomId}-${rand()}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` },
@@ -240,7 +244,7 @@ export function subscribeMembers(roomId: string, onChange: () => void): () => vo
   if (!supabase) return () => {};
   const client = supabase;
   const ch = client
-    .channel(`room-members-${roomId}`)
+    .channel(`room-members-${roomId}-${rand()}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'room_members', filter: `room_id=eq.${roomId}` },
@@ -256,7 +260,7 @@ export function subscribeMessages(roomId: string, onInsert: (m: MessageRow) => v
   if (!supabase) return () => {};
   const client = supabase;
   const ch = client
-    .channel(`room-messages-${roomId}`)
+    .channel(`room-messages-${roomId}-${rand()}`)
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` },

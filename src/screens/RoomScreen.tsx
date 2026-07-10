@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import Animated, {
@@ -29,7 +29,7 @@ import {
   type Participant,
   type Room,
 } from '@/data';
-import { isBackendConfigured, useMyId, useRoomSession } from '@/backend';
+import { isBackendConfigured, kickMember, useMyId, useRoomSession } from '@/backend';
 import { palette, radius, spacing, typography } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 import { InviteFriendsSheet } from './sheets';
@@ -89,7 +89,27 @@ export function RoomScreen({ navigation, route }: Props) {
   // Default to follower until identities resolve, so we never have two "hosts".
   const isHost = !backend || (!!myId && !!session.hostId && session.hostId === myId);
   const playerRef = useRef<WebPlayerHandle>(null);
-  const sync = usePlaybackSync({ roomId: backendRoomId, isHost, enabled: backend, playerRef });
+  const sync = usePlaybackSync({
+    roomId: backendRoomId,
+    isHost,
+    enabled: backend,
+    playerRef,
+    onKicked: (userId) => {
+      if (userId === myId) {
+        Alert.alert('Odadan çıkarıldın', 'Host seni bu odadan çıkardı.');
+        navigation.goBack();
+      }
+    },
+  });
+
+  const kickParticipant = useCallback(
+    (p: Participant) => {
+      if (!backendRoomId) return;
+      kickMember(backendRoomId, p.id);
+      sync.broadcastKick(p.id);
+    },
+    [backendRoomId, sync]
+  );
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [usersOpen, setUsersOpen] = useState(false);
@@ -231,14 +251,21 @@ export function RoomScreen({ navigation, route }: Props) {
                 </View>
                 <IconButton icon="close" size={32} iconSize={16} variant="solid" accessibilityLabel="Kapat" onPress={closeUsers} />
               </View>
-              <UsersPanel participants={participants} bottomInset={insets.bottom} onInvite={() => { closeUsers(); setTimeout(() => setInviteOpen(true), 260); }} />
+              <UsersPanel
+                participants={participants}
+                bottomInset={insets.bottom}
+                isHost={isHost}
+                myId={myId}
+                onKick={kickParticipant}
+                onInvite={() => { closeUsers(); setTimeout(() => setInviteOpen(true), 260); }}
+              />
             </View>
           </Animated.View>
         </View>
       )}
 
       <BottomSheet visible={inviteOpen} onClose={() => setInviteOpen(false)} title="Arkadaş Davet Et" height={0.7}>
-        <InviteFriendsSheet roomName={room.title} />
+        <InviteFriendsSheet roomName={room.title} roomId={backendRoomId} />
       </BottomSheet>
     </ScreenBackground>
   );

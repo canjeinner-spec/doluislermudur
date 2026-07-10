@@ -121,4 +121,6 @@ export type SyncEvent =
   | { kind: 'heartbeat'; time: number; paused: boolean; at: number }
   | { kind: 'content'; url: string; title: string; at: number }
   // A follower asks the host to push its current state right now (on join).
-  | { kind: 'request'; at: number };
+  | { kind: 'request'; at: number }
+  // The host removed a user — that user's client ejects itself from the room.
+  | { kind: 'kicked'; userId: string; at: number };

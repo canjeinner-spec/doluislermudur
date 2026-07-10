@@ -9,6 +9,8 @@ type Args = {
   isHost: boolean;
   enabled: boolean;
   playerRef: RefObject<WebPlayerHandle | null>;
+  /** Called on every client when the host kicks someone (with that user's id). */
+  onKicked?: (userId: string) => void;
 };
 
 /** How far a follower may drift from the host before we hard-seek them back. */
@@ -38,8 +40,10 @@ function applyRemote(p: SyncEvent, player: WebPlayerHandle | null) {
  * - Host: emits control events (via broadcastControl) and a periodic heartbeat.
  * - Followers: apply incoming control events and correct drift on each heartbeat.
  */
-export function usePlaybackSync({ roomId, isHost, enabled, playerRef }: Args) {
+export function usePlaybackSync({ roomId, isHost, enabled, playerRef, onKicked }: Args) {
   const chanRef = useRef<RealtimeChannel | null>(null);
+  const onKickedRef = useRef(onKicked);
+  onKickedRef.current = onKicked;
   // Latest authoritative host state a follower knows about — re-applied every
   // second so the moment the follower's player becomes ready it snaps into sync
   // (a single heartbeat can arrive before the player can accept a seek).
@@ -62,6 +66,11 @@ export function usePlaybackSync({ roomId, isHost, enabled, playerRef }: Args) {
 
     ch.on('broadcast', { event: 'sync' }, ({ payload }) => {
       const p = payload as SyncEvent;
+      // Everyone (including the victim) handles a kick; the victim ejects itself.
+      if (p.kind === 'kicked') {
+        onKickedRef.current?.(p.userId);
+        return;
+      }
       if (isHost) {
         // Answer a new joiner immediately with the current position.
         if (p.kind === 'request') pushState();
@@ -130,5 +139,11 @@ export function usePlaybackSync({ roomId, isHost, enabled, playerRef }: Args) {
     [isHost]
   );
 
-  return { broadcastControl };
+  const broadcastKick = useCallback((userId: string) => {
+    const ch = chanRef.current;
+    if (!ch) return;
+    ch.send({ type: 'broadcast', event: 'sync', payload: { kind: 'kicked', userId, at: Date.now() } });
+  }, []);
+
+  return { broadcastControl, broadcastKick };
 }

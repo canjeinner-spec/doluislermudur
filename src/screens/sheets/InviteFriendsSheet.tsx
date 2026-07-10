@@ -2,16 +2,37 @@ import React, { useState } from 'react';
 import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 
 import { FRIENDS } from '@/data';
+import { inviteByHandle, isBackendConfigured } from '@/backend';
 import { Avatar, GradientButton, Icon, PressableScale, TextField } from '@/components';
 import { palette, radius, spacing, typography } from '@/theme';
 
 /**
- * Friends list whose sole purpose is sending room invitations — no messaging.
- * Each row toggles between "Davet Et" and an invited confirmation.
+ * Room invitations — by @handle (host-only, also lifts a prior kick/ban) or by
+ * sharing the link. The friends list is a convenience shortcut.
  */
-export function InviteFriendsSheet({ roomName }: { roomName?: string }) {
+export function InviteFriendsSheet({ roomName, roomId }: { roomName?: string; roomId?: string }) {
   const [invited, setInvited] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
+  const [handle, setHandle] = useState('');
+  const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [sending, setSending] = useState(false);
+
+  const canInviteByHandle = isBackendConfigured && !!roomId;
+
+  const inviteHandle = async () => {
+    const h = handle.trim();
+    if (!h || !roomId || sending) return;
+    setSending(true);
+    setStatus(null);
+    const id = await inviteByHandle(roomId, h);
+    setSending(false);
+    if (id) {
+      setStatus({ ok: true, msg: `${h.startsWith('@') ? h : '@' + h} davet edildi` });
+      setHandle('');
+    } else {
+      setStatus({ ok: false, msg: 'Bu kullanıcı adı bulunamadı' });
+    }
+  };
 
   const toggle = (id: string) => {
     setInvited((prev) => {
@@ -36,6 +57,31 @@ export function InviteFriendsSheet({ roomName }: { roomName?: string }) {
 
   return (
     <View style={styles.root}>
+      {canInviteByHandle && (
+        <View style={styles.handleBox}>
+          <View style={styles.handleRow}>
+            <TextField
+              value={handle}
+              onChangeText={setHandle}
+              placeholder="@kullanici_adi"
+              icon="person-add"
+              style={styles.handleField}
+              onSubmitEditing={inviteHandle}
+            />
+            <PressableScale onPress={inviteHandle} activeScale={0.94} disabled={!handle.trim() || sending} accessibilityLabel="Davet et">
+              <View style={[styles.handleBtn, (!handle.trim() || sending) && styles.handleBtnOff]}>
+                <Text style={styles.handleBtnText}>Davet</Text>
+              </View>
+            </PressableScale>
+          </View>
+          {status && (
+            <Text style={[styles.handleStatus, { color: status.ok ? palette.online : palette.danger }]}>
+              {status.msg}
+            </Text>
+          )}
+        </View>
+      )}
+
       <TextField
         value={query}
         onChangeText={setQuery}
@@ -128,4 +174,25 @@ const styles = StyleSheet.create({
   cta: {
     marginTop: spacing.sm,
   },
+  handleBox: {
+    marginBottom: spacing.md,
+    gap: spacing.xs,
+  },
+  handleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  handleField: { flex: 1 },
+  handleBtn: {
+    height: 46,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: palette.copper,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  handleBtnOff: { opacity: 0.5 },
+  handleBtnText: { ...typography.subheadEmphasized, color: palette.white },
+  handleStatus: { ...typography.footnote, marginLeft: spacing.xs, fontWeight: '600' },
 });

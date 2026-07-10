@@ -56,9 +56,9 @@ function toVimeo(raw: string): string {
  */
 const CHROME_CSS: Record<string, string> = {
   netflix:
-    '.watch-video--bottom-controls-container,.PlayerControlsNeo__bottom-controls,.PlayerControlsNeo__button-control-row,.watch-video--back-container,.watch-video--evidence-overlay-container{opacity:0!important;pointer-events:none!important;}',
+    '.watch-video--bottom-controls-container,.PlayerControlsNeo__bottom-controls,.PlayerControlsNeo__button-control-row,.PlayerControlsNeo__core-controls,.watch-video--back-container,.watch-video--evidence-overlay-container,[data-uia="controls-standard"],[data-uia="control-back"],[data-uia="video-title"],.watch-video--player-titletreatment-logo,.medialist-container,.nextEpisode,.skip-credits{opacity:0!important;pointer-events:none!important;}',
   prime:
-    '.atvwebplayersdk-bottompanel-container,.atvwebplayersdk-hideabletopbuttons-container,.atvwebplayersdk-timeindicator-text,.atvwebplayersdk-fastseekback-button,.atvwebplayersdk-fastseekforward-button,.atvwebplayersdk-playpause-button{opacity:0!important;pointer-events:none!important;}',
+    '.atvwebplayersdk-bottompanel-container,.atvwebplayersdk-hideabletopbuttons-container,.atvwebplayersdk-timeindicator-text,.atvwebplayersdk-fastseekback-button,.atvwebplayersdk-fastseekforward-button,.atvwebplayersdk-playpause-button,.atvwebplayersdk-title-text,.atvwebplayersdk-subtitle-text,.atvwebplayersdk-overflowmenu-button,.atvwebplayersdk-nexttitle-button,.atvwebplayersdk-skipelement-button,.atvwebplayersdk-infobar-container{opacity:0!important;pointer-events:none!important;}',
 };
 
 /**
@@ -80,9 +80,16 @@ function buildController(platform: string): string {
   function ensureStyle(){ if(!HIDE_CSS) return; if(document.getElementById('__astera_css')) return;
     try{var s=document.createElement('style');s.id='__astera_css';s.innerHTML=HIDE_CSS;(document.head||document.documentElement).appendChild(s);}catch(e){} }
   function findVideo(){
-    var best=null,area=-1,list=document.querySelectorAll('video');
-    for(var i=0;i<list.length;i++){var v=list[i];var r=v.getBoundingClientRect();var a=r.width*r.height;
-      if((v.src||v.currentSrc||v.readyState>0)&&a>=area){area=a;best=v;}}
+    // Pick the real feature, not a short trailer/preview loop. A long duration
+    // (>5min) and actively-playing-with-sound score far above raw size, so a
+    // muted autoplaying trailer never wins over the title the user chose.
+    var best=null,score=-1,list=document.querySelectorAll('video');
+    for(var i=0;i<list.length;i++){var v=list[i];
+      if(!(v.src||v.currentSrc||v.readyState>0))continue;
+      var r=v.getBoundingClientRect();var area=r.width*r.height;
+      var dur=isFinite(v.duration)?v.duration:0;
+      var s=area+(dur>300?4e9:0)+(!v.paused?1e9:0)+(!v.muted?5e8:0);
+      if(s>score){score=s;best=v;}}
     return best;
   }
   function isSignin(){
@@ -107,8 +114,25 @@ function buildController(platform: string): string {
     else if(cmd.type==='seek'){v.currentTime=cmd.time;}
     else if(cmd.type==='seekBy'){v.currentTime=Math.max(0,(v.currentTime||0)+cmd.delta);}
     else if(cmd.type==='mute'){v.muted=!!cmd.value;}}catch(e){}setTimeout(report,60);};
+  // Prime doesn't deep-link to playback, so a follower opening the detail page
+  // just sees the muted trailer. Nudge the provider's own "Play/İzle" button
+  // once to start the real title (never a "trailer/fragman" button). Best-effort
+  // and Prime-only so it can't disturb YouTube/Drive/Netflix.
+  var started=false;
+  function autostart(){
+    if(started||'${platform}'!=='prime')return;
+    var v=findVideo();
+    if(v&&isFinite(v.duration)&&v.duration>300&&!v.paused){started=true;return;}
+    var btns=document.querySelectorAll('button,a,[role=button]');
+    for(var i=0;i<btns.length;i++){var b=btns[i];var r=b.getBoundingClientRect();
+      if(r.width<40||r.height<20)continue;
+      var t=((b.getAttribute('aria-label')||'')+' '+(b.textContent||'')).toLowerCase();
+      if(/trailer|fragman|preview/.test(t))continue;
+      if(/\\bplay\\b|resume|watch now|izle|oynat|devam/.test(t)){
+        started=true;try{b.click();}catch(e){}return;}}
+  }
   ['play','pause','seeked','ended','loadedmetadata','canplay','timeupdate'].forEach(function(ev){document.addEventListener(ev,report,true);});
-  setInterval(report,800);ensureStyle();report();true;
+  setInterval(report,800);setInterval(autostart,1200);ensureStyle();report();true;
 })();
 `;
 }

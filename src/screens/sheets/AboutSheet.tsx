@@ -31,13 +31,13 @@ export function AboutSheet() {
       </View>
 
       <PressableScale
-        onPress={() => Linking.openURL('https://instagram.com/ardaowski')}
+        onPress={() => Linking.openURL('https://instagram.com/ardaowskix')}
         activeScale={0.98}
-        accessibilityLabel="Instagram: ardaowski"
+        accessibilityLabel="Instagram: ardaowskix"
       >
         <View style={styles.linkRow}>
           <Text style={[typography.body, styles.linkText]}>Instagram</Text>
-          <Text style={[typography.bodyEmphasized, styles.handle]}>@ardaowski</Text>
+          <Text style={[typography.bodyEmphasized, styles.handle]}>@ardaowskix</Text>
           <Icon name="chevron-right" size={17} color={palette.textTertiary} />
         </View>
       </PressableScale>

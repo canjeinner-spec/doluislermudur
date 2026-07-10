@@ -57,7 +57,7 @@ export function WelcomeScreen({ navigation }: Props) {
 
             <View style={styles.sign}>
               <Text style={[typography.bodyEmphasized, styles.signName]}>— Arda</Text>
-              <Text style={[typography.footnote, styles.handle]}>Instagram · @ardaowski</Text>
+              <Text style={[typography.footnote, styles.handle]}>Instagram · @ardaowskix</Text>
             </View>
           </GlassSurface>
         </Animated.View>

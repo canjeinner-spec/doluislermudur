@@ -49,10 +49,16 @@ export function useRooms(): { rooms: Room[]; loading: boolean; refresh: () => vo
 }
 
 /** Current auth identity + whether it's an anonymous ("Başlayalım") user. */
-export function useAuth(): { userId: string | null; isAnonymous: boolean; loading: boolean } {
-  const [state, setState] = useState<{ userId: string | null; isAnonymous: boolean }>({
+export function useAuth(): {
+  userId: string | null;
+  isAnonymous: boolean;
+  email: string | null;
+  loading: boolean;
+} {
+  const [state, setState] = useState<{ userId: string | null; isAnonymous: boolean; email: string | null }>({
     userId: null,
     isAnonymous: true,
+    email: null,
   });
   const [loading, setLoading] = useState(isBackendConfigured);
 
@@ -62,8 +68,8 @@ export function useAuth(): { userId: string | null; isAnonymous: boolean; loadin
       return;
     }
     const client = supabase;
-    const apply = (u: { id: string; is_anonymous?: boolean } | null) =>
-      setState({ userId: u?.id ?? null, isAnonymous: u?.is_anonymous ?? true });
+    const apply = (u: { id: string; is_anonymous?: boolean; email?: string } | null) =>
+      setState({ userId: u?.id ?? null, isAnonymous: u?.is_anonymous ?? true, email: u?.email ?? null });
     client.auth.getUser().then(({ data }) => {
       apply(data.user);
       setLoading(false);
@@ -85,29 +91,27 @@ export function useMyId(): string | null {
   return id;
 }
 
-/** The signed-in user's own profile row, live-ish (refetched on mount). */
-export function useMyProfile(): { profile: ProfileRow | null; loading: boolean } {
+/** The signed-in user's own profile row. Call refresh() to refetch (e.g. after editing). */
+export function useMyProfile(): { profile: ProfileRow | null; loading: boolean; refresh: () => void } {
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [loading, setLoading] = useState(isBackendConfigured);
+
+  const refresh = useCallback(async () => {
+    if (!isBackendConfigured) return;
+    const p = await fetchMyProfile();
+    setProfile(p);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     if (!isBackendConfigured) {
       setLoading(false);
       return;
     }
-    let alive = true;
-    fetchMyProfile().then((p) => {
-      if (alive) {
-        setProfile(p);
-        setLoading(false);
-      }
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
+    refresh();
+  }, [refresh]);
 
-  return { profile, loading };
+  return { profile, loading, refresh };
 }
 
 export type RoomSession = {

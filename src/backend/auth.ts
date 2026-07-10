@@ -120,6 +120,23 @@ export async function register(email: string, password: string, displayName: str
   return null; // success
 }
 
+/** Sign out, then drop back to a fresh anonymous session so the app keeps working. */
+export async function signOut(): Promise<void> {
+  if (!supabase) return;
+  await supabase.auth.signOut();
+  await ensureSession();
+}
+
+/** Permanently delete the current account (cascades profile/rooms), then reset. */
+export async function deleteAccount(): Promise<string | null> {
+  if (!supabase) return null;
+  const { error } = await supabase.rpc('delete_account');
+  if (error) return error.message;
+  await supabase.auth.signOut();
+  await ensureSession();
+  return null;
+}
+
 /** Set the user's @handle (registered only, once per 7 days). Returns error msg. */
 export async function setHandle(handle: string): Promise<{ ok: boolean; value?: string; error?: string }> {
   if (!supabase) return { ok: false, error: 'Bağlantı yok' };

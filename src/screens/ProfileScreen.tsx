@@ -1,20 +1,13 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import {
-  Avatar,
-  GlassSurface,
-  Icon,
-  IconButton,
-  NavBar,
-  PlatformLogo,
-  ScreenBackground,
-} from '@/components';
-import type { IconName, PlatformId } from '@/components';
-import { CURRENT_USER, ROOMS } from '@/data';
-import { useMyProfile } from '@/backend';
+import { Avatar, GlassSurface, Icon, IconButton, NavBar, ScreenBackground } from '@/components';
+import type { IconName } from '@/components';
+import { CURRENT_USER } from '@/data';
+import { useAuth, useMyProfile } from '@/backend';
 import { palette, radius, spacing, typography } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 
@@ -23,33 +16,22 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 const TR_MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
 function formatWatch(minutes: number): string {
-  if (minutes >= 60) return `${Math.floor(minutes / 60)}s`;
-  return `${minutes}dk`;
+  if (minutes >= 60) return `${Math.floor(minutes / 60)}s ${minutes % 60}dk`;
+  return `${minutes} dk`;
 }
 
 function memberSince(iso?: string): string {
-  if (!iso) return 'Ocak 2026';
+  if (!iso) return '—';
   const d = new Date(iso);
   return `${TR_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-const PLATFORM_USAGE: { id: PlatformId; label: string; pct: number }[] = [
-  { id: 'netflix', label: 'Netflix', pct: 0.62 },
-  { id: 'youtube', label: 'YouTube', pct: 0.24 },
-  { id: 'prime', label: 'Prime Video', pct: 0.14 },
-];
-
-const BADGES: { icon: IconName; label: string }[] = [
-  { icon: 'sparkle', label: 'İlk Oda' },
-  { icon: 'crown', label: 'Sunucu' },
-  { icon: 'eye', label: 'Sinefil' },
-  { icon: 'users', label: 'Sosyal' },
-  { icon: 'play', label: 'Gece Kuşu' },
-];
-
 export function ProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { profile } = useMyProfile();
+  const { profile, refresh } = useMyProfile();
+  const { email } = useAuth();
+
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
   const name = profile?.display_name ?? CURRENT_USER.name;
   const handle = profile?.handle ?? CURRENT_USER.handle;
@@ -58,7 +40,6 @@ export function ProfileScreen({ navigation }: Props) {
   const stats: { label: string; value: string; icon: IconName }[] = [
     { label: 'İzleme', value: formatWatch(profile?.minutes_watched ?? 0), icon: 'eye' },
     { label: 'Kurulan Oda', value: String(profile?.rooms_hosted ?? 0), icon: 'rooms' },
-    { label: 'Arkadaş', value: '0', icon: 'users' },
   ];
 
   return (
@@ -68,7 +49,14 @@ export function ProfileScreen({ navigation }: Props) {
         left={
           <IconButton icon="chevron-left" variant="glass" accessibilityLabel="Geri" onPress={() => navigation.goBack()} />
         }
-        right={<IconButton icon="settings" variant="glass" accessibilityLabel="Ayarlar" />}
+        right={
+          <IconButton
+            icon="edit"
+            variant="glass"
+            accessibilityLabel="Profili düzenle"
+            onPress={() => navigation.navigate('ProfileEdit')}
+          />
+        }
       />
 
       <ScrollView
@@ -77,7 +65,7 @@ export function ProfileScreen({ navigation }: Props) {
       >
         {/* Hero */}
         <GlassSurface borderRadius={radius.xxl} intensity={28} style={styles.hero}>
-          <Avatar name={name} tint={tint} size={78} online />
+          <Avatar name={name} tint={tint} size={82} online />
           <Text style={[typography.title2, styles.name]}>{name}</Text>
           <Text style={[typography.subhead, styles.handle]}>{handle}</Text>
           <View style={styles.memberChip}>
@@ -86,7 +74,7 @@ export function ProfileScreen({ navigation }: Props) {
           </View>
         </GlassSurface>
 
-        {/* Stat tiles */}
+        {/* Stat tiles (real) */}
         <View style={styles.statRow}>
           {stats.map((s) => (
             <GlassSurface key={s.label} borderRadius={radius.lg} intensity={24} style={styles.statCard}>
@@ -97,63 +85,14 @@ export function ProfileScreen({ navigation }: Props) {
           ))}
         </View>
 
-        {/* This month */}
-        <Text style={styles.section}>BU AY</Text>
+        {/* Account (real) */}
+        <Text style={styles.section}>HESAP</Text>
         <GlassSurface borderRadius={radius.lg} intensity={24} style={styles.block}>
-          <Row icon="eye" label="İzleme süresi" value="12s 40dk" />
+          <Row icon="globe" label="E-posta" value={email ?? 'Anonim hesap'} />
           <View style={styles.divider} />
-          <Row icon="rooms" label="Katıldığın oda" value="9" />
+          <Row icon="person-add" label="Kullanıcı adı" value={handle} />
           <View style={styles.divider} />
-          <Row icon="person-add" label="Gönderilen davet" value="14" />
-        </GlassSurface>
-
-        {/* Favorite platforms */}
-        <Text style={styles.section}>FAVORİ PLATFORMLAR</Text>
-        <GlassSurface borderRadius={radius.lg} intensity={24} style={styles.block}>
-          {PLATFORM_USAGE.map((p, i) => (
-            <View key={p.id}>
-              {i > 0 && <View style={styles.divider} />}
-              <View style={styles.platformRow}>
-                <PlatformLogo id={p.id} size={30} />
-                <View style={styles.platformText}>
-                  <Text style={[typography.subheadEmphasized, styles.platformName]}>{p.label}</Text>
-                  <View style={styles.bar}>
-                    <View style={[styles.barFill, { width: `${Math.round(p.pct * 100)}%` }]} />
-                  </View>
-                </View>
-                <Text style={[typography.footnoteEmphasized, styles.pct]}>%{Math.round(p.pct * 100)}</Text>
-              </View>
-            </View>
-          ))}
-        </GlassSurface>
-
-        {/* Badges */}
-        <Text style={styles.section}>ROZETLER</Text>
-        <View style={styles.badges}>
-          {BADGES.map((b) => (
-            <GlassSurface key={b.label} borderRadius={radius.pill} intensity={22} style={styles.badge}>
-              <Icon name={b.icon} size={14} color={palette.amberBright} filled />
-              <Text style={[typography.footnoteEmphasized, styles.badgeText]}>{b.label}</Text>
-            </GlassSurface>
-          ))}
-        </View>
-
-        {/* Recently watched */}
-        <Text style={styles.section}>SON İZLENENLER</Text>
-        <GlassSurface borderRadius={radius.lg} intensity={24} style={styles.block}>
-          {ROOMS.slice(0, 3).map((r, i) => (
-            <View key={r.id}>
-              {i > 0 && <View style={styles.divider} />}
-              <View style={styles.recentRow}>
-                <PlatformLogo id={r.platform} size={30} />
-                <View style={styles.recentText}>
-                  <Text style={[typography.subheadEmphasized, styles.recentTitle]} numberOfLines={1}>{r.title}</Text>
-                  <Text style={[typography.caption1, styles.recentSub]}>{r.platformLabel}</Text>
-                </View>
-                <Text style={[typography.caption1, styles.recentAgo]}>{i === 0 ? 'Dün' : `${i + 1} gün önce`}</Text>
-              </View>
-            </View>
-          ))}
+          <Row icon="sparkle" label="Üyelik" value={memberSince(profile?.created_at)} />
         </GlassSurface>
       </ScrollView>
     </ScreenBackground>
@@ -167,18 +106,16 @@ function Row({ icon, label, value }: { icon: IconName; label: string; value: str
         <Icon name={icon} size={17} color={palette.amber} />
       </View>
       <Text style={[typography.body, styles.rowLabel]}>{label}</Text>
-      <Text style={[typography.bodyEmphasized, styles.rowValue]}>{value}</Text>
+      <Text style={[typography.bodyEmphasized, styles.rowValue]} numberOfLines={1}>
+        {value}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, gap: spacing.md },
-  hero: {
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
-    gap: 3,
-  },
+  hero: { alignItems: 'center', paddingVertical: spacing.xl, gap: 3 },
   name: { color: palette.textPrimary, marginTop: spacing.sm },
   handle: { color: palette.textSecondary },
   memberChip: {
@@ -216,26 +153,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   rowLabel: { flex: 1, color: palette.textPrimary },
-  rowValue: { color: palette.textPrimary },
+  rowValue: { color: palette.textSecondary, maxWidth: 190 },
   divider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.separator, marginLeft: 46 },
-  platformRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
-  platformText: { flex: 1, gap: 6 },
-  platformName: { color: palette.textPrimary },
-  bar: { height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.10)', overflow: 'hidden' },
-  barFill: { height: 5, borderRadius: 3, backgroundColor: palette.copper },
-  pct: { color: palette.textSecondary },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  badgeText: { color: palette.textPrimary },
-  recentRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
-  recentText: { flex: 1, gap: 1 },
-  recentTitle: { color: palette.textPrimary },
-  recentSub: { color: palette.textTertiary },
-  recentAgo: { color: palette.textTertiary },
 });

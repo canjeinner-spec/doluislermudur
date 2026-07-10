@@ -18,6 +18,8 @@ export type IconName =
   | 'chevron-left'
   | 'chevron-down'
   | 'settings'
+  | 'edit'
+  | 'logout'
   | 'info'
   | 'rooms'
   | 'users'
@@ -139,6 +141,20 @@ function renderGlyph(
             d="M12 2.8v2.2M12 19v2.2M21.2 12H19M5 12H2.8M18.5 5.5l-1.6 1.6M7.1 16.9l-1.6 1.6M18.5 18.5l-1.6-1.6M7.1 7.1 5.5 5.5"
             {...stroke}
           />
+        </>
+      );
+    case 'edit':
+      return (
+        <>
+          <Path d="M12 20h9" {...stroke} />
+          <Path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" {...stroke} />
+        </>
+      );
+    case 'logout':
+      return (
+        <>
+          <Path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" {...stroke} />
+          <Path d="M16 17l5-5-5-5M21 12H9" {...stroke} />
         </>
       );
     case 'info':

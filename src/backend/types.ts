@@ -108,6 +108,10 @@ export interface Database {
         Args: { p_handle: string };
         Returns: string;
       };
+      delete_account: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

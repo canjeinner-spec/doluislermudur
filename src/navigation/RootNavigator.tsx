@@ -7,6 +7,7 @@ import { OnboardingScreen } from '@/screens/OnboardingScreen';
 import { LoginScreen } from '@/screens/LoginScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
+import { ProfileEditScreen } from '@/screens/ProfileEditScreen';
 import { CreateRoomScreen } from '@/screens/CreateRoomScreen';
 import { PlatformSelectScreen } from '@/screens/PlatformSelectScreen';
 import { WebViewLoginScreen } from '@/screens/WebViewLoginScreen';
@@ -42,6 +43,7 @@ export function RootNavigator() {
       <Stack.Screen name="Login" component={LoginScreen} options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="ProfileEdit" component={ProfileEditScreen} />
       <Stack.Screen name="CreateRoom" component={CreateRoomScreen} />
       <Stack.Screen name="PlatformSelect" component={PlatformSelectScreen} />
       <Stack.Screen name="WebViewLogin" component={WebViewLoginScreen} />

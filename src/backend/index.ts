@@ -8,6 +8,8 @@ export {
   signIn,
   register,
   setHandle,
+  signOut,
+  deleteAccount,
 } from './auth';
 export {
   createRoom,

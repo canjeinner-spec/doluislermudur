@@ -50,13 +50,29 @@ export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [sheet, setSheet] = useState<SheetKey | null>(null);
-  const [authGate, setAuthGate] = useState(false);
+  const [gate, setGate] = useState<null | 'create' | 'profile'>(null);
 
   const { isAnonymous } = useAuth();
+  const locked = isBackendConfigured && isAnonymous;
   const createRoom = () => {
-    if (isBackendConfigured && isAnonymous) setAuthGate(true);
+    if (locked) setGate('create');
     else navigation.navigate('CreateRoom');
   };
+  const openProfile = () => {
+    if (locked) setGate('profile');
+    else navigation.navigate('Profile');
+  };
+
+  const GATE_COPY = {
+    create: {
+      title: 'Oda oluşturmak için giriş yap',
+      message: 'Oda kurmak ve etkileşmek için bir hesabın olmalı. Giriş yapmadan mevcut odaları izleyebilirsin.',
+    },
+    profile: {
+      title: 'Profil için giriş yap',
+      message: 'Profilini görebilmek ve düzenleyebilmek için giriş yapmış olman gerekiyor.',
+    },
+  } as const;
 
   const { rooms: liveRooms, refresh } = useRooms();
   const source = isBackendConfigured ? liveRooms : ROOMS;
@@ -97,7 +113,7 @@ export function HomeScreen({ navigation }: Props) {
             iconSize={24}
             variant="plain"
             accessibilityLabel="Profil"
-            onPress={() => navigation.navigate('Profile')}
+            onPress={openProfile}
           />
         }
       />
@@ -194,11 +210,11 @@ export function HomeScreen({ navigation }: Props) {
       </BottomSheet>
 
       <AuthGateModal
-        visible={authGate}
-        onClose={() => setAuthGate(false)}
-        onLogin={() => { setAuthGate(false); navigation.navigate('Login'); }}
-        title="Oda oluşturmak için giriş yap"
-        message="Oda kurmak ve etkileşmek için bir hesabın olmalı. Giriş yapmadan mevcut odaları izleyebilirsin."
+        visible={gate !== null}
+        onClose={() => setGate(null)}
+        onLogin={() => { setGate(null); navigation.navigate('Login'); }}
+        title={gate ? GATE_COPY[gate].title : undefined}
+        message={gate ? GATE_COPY[gate].message : undefined}
       />
     </ScreenBackground>
   );

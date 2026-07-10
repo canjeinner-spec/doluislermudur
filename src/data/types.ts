@@ -44,6 +44,8 @@ export interface ChatMessage {
   time: string;
   /** True when the local user sent it (right-aligned bubble). */
   mine?: boolean;
+  /** Presence notice instead of a chat bubble: someone joined/left/was kicked. */
+  system?: 'join' | 'leave' | 'kick';
 }
 
 export interface Platform {

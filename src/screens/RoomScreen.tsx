@@ -101,12 +101,16 @@ export function RoomScreen({ navigation, route }: Props) {
   // Set right before a *programmatic* leave (confirmed exit / kick) so the
   // beforeRemove guard lets it through without re-asking.
   const leavingConfirmedRef = useRef(false);
+  // User ids that left because they were kicked (not a voluntary leave), so chat
+  // can label the presence notice "atıldı" vs "ayrıldı". Consumed by ChatView.
+  const kickedIdsRef = useRef<Set<string>>(new Set());
   const sync = usePlaybackSync({
     roomId: backendRoomId,
     isHost,
     enabled: backend,
     playerRef,
     onKicked: (userId) => {
+      kickedIdsRef.current.add(userId);
       if (userId === myId) {
         Alert.alert('Odadan çıkarıldın', 'Host seni bu odadan çıkardı.');
         leavingConfirmedRef.current = true;
@@ -140,6 +144,9 @@ export function RoomScreen({ navigation, route }: Props) {
   const kickParticipant = useCallback(
     (p: Participant) => {
       if (!backendRoomId) return;
+      // The host doesn't receive its own broadcast (self:false), so record the
+      // kick locally too — otherwise our own chat would say "ayrıldı".
+      kickedIdsRef.current.add(p.id);
       kickMember(backendRoomId, p.id);
       sync.broadcastKick(p.id);
     },
@@ -261,6 +268,7 @@ export function RoomScreen({ navigation, route }: Props) {
             myId={myId}
             participants={participants}
             ready={!session.loading}
+            kickedIdsRef={kickedIdsRef}
             canInteract={canInteract}
             onRequireAuth={() => setAuthGate(true)}
           />

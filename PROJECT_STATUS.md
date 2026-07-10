@@ -102,6 +102,9 @@ Backend `isBackendConfigured` arkasında; yapılandırılmadıysa mock veriye d�
   (o üyenin geçmiş mesajları dahil) anında güncellenir (`subscribeProfiles`).
 - **Kazara oda çıkışı engellendi:** kaydırma jesti kapalı; çıkış yalnızca sol üst X ile ve
   "emin misin?" onayıyla (Android donanım geri tuşu da onaydan geçer; kick istisna).
+- **Sohbette katılım bildirimleri:** biri odaya girince/çıkınca/atılınca sohbete "{ad} katıldı /
+  ayrıldı / atıldı" sistem satırı (avatarıyla) düşer. Roster diff'i ile üretilir; kick vs ayrılma
+  RoomScreen'in kicked-id seti ile ayrılır. Kendi katılışın ve baştan orada olanlar için bildirim çıkmaz.
 - İzleme süresi sayacı (dakikada +1) ve "geçirilen süre" / "kurulan oda" istatistikleri.
 - **Odada giriş yap → aynı odaya yeni hesapla dön** (eski anonim izleyici sayımda kalmaz).
 - Platform logoları: koyu karo kaldırıldı, şeffaf SVG sembol logolar (Netflix/YouTube/Prime/

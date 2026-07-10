@@ -36,6 +36,8 @@ type Props = {
   participants?: Participant[];
   /** Only load history once we've actually joined (RLS needs membership). */
   ready?: boolean;
+  /** Ids that left via a kick (vs. a voluntary leave) — for the presence notice. */
+  kickedIdsRef?: React.RefObject<Set<string>>;
   /** Anonymous users can watch but not chat — false shows the auth gate. */
   canInteract?: boolean;
   onRequireAuth?: () => void;
@@ -92,6 +94,7 @@ export function ChatView({
   myId,
   participants,
   ready = true,
+  kickedIdsRef,
   canInteract = true,
   onRequireAuth,
 }: Props) {
@@ -125,6 +128,40 @@ export function ChatView({
       return changed ? next : prev;
     });
   }, [participants]);
+
+  // Presence notices: diff the live roster to announce who joined / left / was
+  // kicked. The first loaded roster is the baseline (no notices for people
+  // already here, nor for our own join). Kicks are told apart from leaves via
+  // the kicked-id set the room screen fills in.
+  const rosterRef = useRef<Map<string, Participant> | null>(null);
+  useEffect(() => {
+    if (!backend || !ready || !participants) return;
+    const cur = new Map(participants.map((p) => [p.id, p]));
+    const prev = rosterRef.current;
+    rosterRef.current = cur;
+    if (prev === null) return; // baseline snapshot — seed only
+
+    const notices: ChatMessage[] = [];
+    const notice = (p: Participant, kind: 'join' | 'leave' | 'kick'): ChatMessage => ({
+      id: `sys-${kind}-${p.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      authorId: p.id,
+      authorName: p.name,
+      tint: p.tint,
+      avatarUrl: p.avatarUrl ?? null,
+      text: '',
+      time: '',
+      system: kind,
+    });
+
+    for (const [id, p] of cur) if (!prev.has(id)) notices.push(notice(p, 'join'));
+    for (const [id, p] of prev) {
+      if (cur.has(id)) continue;
+      const kicked = kickedIdsRef?.current?.has(id) ?? false;
+      if (kicked) kickedIdsRef?.current?.delete(id);
+      notices.push(notice(p, kicked ? 'kick' : 'leave'));
+    }
+    if (notices.length) setMessages((m) => [...m, ...notices]);
+  }, [participants, ready, backend, kickedIdsRef]);
 
   // Chat is ephemeral: no history is loaded. You only see messages posted while
   // you're in the room, so anyone who left (or left and rejoined) starts clean.
@@ -176,7 +213,11 @@ export function ChatView({
   const data = useMemo<Row[]>(() => {
     const rows = messages.map((m, i) => ({
       message: m,
-      grouped: messages[i - 1]?.authorId === m.authorId && messages[i - 1]?.mine === m.mine,
+      grouped:
+        !m.system &&
+        !messages[i - 1]?.system &&
+        messages[i - 1]?.authorId === m.authorId &&
+        messages[i - 1]?.mine === m.mine,
     }));
     return rows.reverse();
   }, [messages]);
@@ -203,7 +244,13 @@ export function ChatView({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
-        renderItem={({ item }) => <MessageRow message={item.message} grouped={item.grouped} />}
+        renderItem={({ item }) =>
+          item.message.system ? (
+            <SystemNotice message={item.message} />
+          ) : (
+            <MessageRow message={item.message} grouped={item.grouped} />
+          )
+        }
         ListFooterComponent={
           <View style={styles.header}>
             <View style={styles.systemRow}>
@@ -269,6 +316,27 @@ export function ChatView({
 }
 
 const AVATAR = 36;
+const SYS_AVATAR = 30;
+
+const SYS_LABEL: Record<'join' | 'leave' | 'kick', string> = {
+  join: 'katıldı',
+  leave: 'ayrıldı',
+  kick: 'atıldı',
+};
+
+/** Ephemeral presence line: "{name} katıldı / ayrıldı / atıldı" with the avatar. */
+function SystemNotice({ message }: { message: ChatMessage }) {
+  const kind = message.system ?? 'join';
+  return (
+    <Animated.View entering={FadeIn.duration(160)} style={styles.systemNoticeRow}>
+      <Text style={styles.systemNoticeText} numberOfLines={1}>
+        <Text style={styles.systemNoticeName}>{message.authorName}</Text>{' '}
+        <Text style={kind === 'kick' ? styles.systemNoticeKick : undefined}>{SYS_LABEL[kind]}</Text>
+      </Text>
+      <Avatar name={message.authorName} tint={message.tint} size={SYS_AVATAR} imageUrl={message.avatarUrl} />
+    </Animated.View>
+  );
+}
 
 function MessageRow({ message, grouped }: { message: ChatMessage; grouped: boolean }) {
   if (message.mine) {
@@ -338,6 +406,16 @@ const styles = StyleSheet.create({
     paddingRight: 44,
   },
   grouped: { marginTop: -spacing.sm + 1 },
+  systemNoticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    paddingLeft: 40,
+  },
+  systemNoticeText: { ...typography.footnote, color: palette.textSecondary, flexShrink: 1, textAlign: 'right' },
+  systemNoticeName: { color: palette.textPrimary, fontWeight: '800' },
+  systemNoticeKick: { color: palette.danger, fontWeight: '700' },
   otherText: { flex: 1, color: palette.textPrimary, fontSize: 16, lineHeight: 22, paddingTop: 6 },
   otherName: { fontWeight: '800', color: palette.white },
   mineRow: {

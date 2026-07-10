@@ -16,8 +16,9 @@ type Step = 'email' | 'password' | 'register';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-export function LoginScreen({ navigation }: Props) {
+export function LoginScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
+  const returnRoomId = route.params?.returnRoomId;
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,8 +27,15 @@ export function LoginScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   // Reset the stack to a single Home so we never end up with two Home screens
-  // (each opening the same realtime channel and colliding).
-  const done = () => navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+  // (each opening the same realtime channel and colliding). When we arrived from
+  // a room, re-enter that room on top of Home so the anonymous "viewer" is now
+  // replaced by the freshly signed-in account (which re-joins the roster).
+  const done = () =>
+    navigation.reset(
+      returnRoomId
+        ? { index: 1, routes: [{ name: 'Home' }, { name: 'Room', params: { roomId: returnRoomId } }] }
+        : { index: 0, routes: [{ name: 'Home' }] }
+    );
 
   const checkEmail = async () => {
     setError(null);

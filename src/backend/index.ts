@@ -15,6 +15,7 @@ export {
   createRoom,
   joinRoom,
   leaveRoom,
+  currentUserId,
   updateRoomContent,
   kickMember,
   inviteByHandle,

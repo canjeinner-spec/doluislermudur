@@ -288,10 +288,12 @@ export function RoomScreen({ navigation, route }: Props) {
         onClose={() => setAuthGate(false)}
         onLogin={() => {
           setAuthGate(false);
-          // Leave the room as the current (anonymous) user before the session
-          // switches, so the stale viewer doesn't linger in the room count.
+          // Leave the room as the current (anonymous) user *now*, while we still
+          // hold the anonymous session — RLS only lets you delete your own row,
+          // so this can't be done after the login switches the session.
           if (backendRoomId) leaveRoom(backendRoomId);
-          navigation.navigate('Login');
+          // Ask Login to drop us back into this room as the new account.
+          navigation.navigate('Login', backendRoomId ? { returnRoomId: backendRoomId } : undefined);
         }}
       />
     </ScreenBackground>

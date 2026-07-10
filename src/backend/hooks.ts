@@ -12,6 +12,7 @@ import {
   fetchRooms,
   joinRoom,
   leaveRoom,
+  currentUserId,
   memberToParticipant,
   subscribeMembers,
   subscribeRoom,
@@ -154,8 +155,15 @@ export function useRoomSession(roomId: string | undefined): RoomSession {
       setLoading(false);
     };
 
-    // Join first so RLS lets us read the roster, then load + subscribe.
-    joinRoom(roomId).then(load);
+    // Join first so RLS lets us read the roster, then load + subscribe. Capture
+    // the uid we joined as, so tear-down leaves *that* membership even if the
+    // session later switched (in-room login) — never the new account's row.
+    let joinedUid: string | null = null;
+    (async () => {
+      joinedUid = await currentUserId();
+      await joinRoom(roomId);
+      await load();
+    })();
     const unsubRoom = subscribeRoom(roomId, load);
     const unsubMembers = subscribeMembers(roomId, load);
 
@@ -163,7 +171,7 @@ export function useRoomSession(roomId: string | undefined): RoomSession {
       alive = false;
       unsubRoom();
       unsubMembers();
-      leaveRoom(roomId);
+      leaveRoom(roomId, joinedUid ?? undefined);
     };
   }, [roomId]);
 

@@ -7,7 +7,8 @@ export interface RoomDraft {
 
 export type RootStackParamList = {
   Onboarding: undefined;
-  Login: undefined;
+  /** returnRoomId: after signing in, re-enter this room as the new account. */
+  Login: { returnRoomId?: string } | undefined;
   Home: undefined;
   Profile: undefined;
   ProfileEdit: undefined;

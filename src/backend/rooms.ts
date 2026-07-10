@@ -10,6 +10,11 @@ async function uid(): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
+/** The signed-in user's id (anonymous or permanent), or null. */
+export async function currentUserId(): Promise<string | null> {
+  return uid();
+}
+
 /** Deterministic poster gradient for a room id (we have no real artwork yet). */
 function posterFor(id: string): number {
   let h = 0;
@@ -159,9 +164,12 @@ export async function addWatchMinutes(minutes: number): Promise<void> {
   await supabase.rpc('add_watch_minutes', { p_minutes: minutes });
 }
 
-export async function leaveRoom(roomId: string): Promise<void> {
+export async function leaveRoom(roomId: string, userId?: string): Promise<void> {
   if (!supabase) return;
-  const me = await uid();
+  // Leave a specific membership when given (captured at join time). This keeps a
+  // screen tear-down from deleting the *new* account's row after an in-room login
+  // switched the session — RLS only lets you delete your own row anyway.
+  const me = userId ?? (await uid());
   if (!me) return;
   await supabase.from('room_members').delete().eq('room_id', roomId).eq('user_id', me);
 }

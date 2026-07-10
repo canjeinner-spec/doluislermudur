@@ -102,6 +102,14 @@ Backend `isBackendConfigured` arkasında; yapılandırılmadıysa mock veriye d�
   (o üyenin geçmiş mesajları dahil) anında güncellenir (`subscribeProfiles`).
 - **Kazara oda çıkışı engellendi:** kaydırma jesti kapalı; çıkış yalnızca sol üst X ile ve
   "emin misin?" onayıyla (Android donanım geri tuşu da onaydan geçer; kick istisna).
+- **Kayıt/giriş e-posta kısıtı:** yalnızca bilinen sağlayıcılar (Gmail, Outlook, iCloud, Yahoo,
+  Proton, Yandex…) — `emailPolicy.ts`, saçma/rastgele domainler engellenir.
+- **Oda üst bar (Rave tarzı):** sade büyük iconlar (cam/gri arka plan yok), ortada ASTERA
+  wordmark (tam ortalı), sol grupta X + arama(=içeriği değiştir, host'a özel), sağda davet +
+  kullanıcılar (sayı rozeti yok). Alttaki "Değiştir" kaldırıldı; wordmark ortak `Wordmark` bileşeni.
+- **İlk açılış teşekkür ekranı** (`WelcomeScreen`): uzun mesafe/arkadaşlar için kişisel not +
+  Instagram @ardaowski; yalnızca ilk açılışta, Onboarding'den önce.
+- **Bilgilendirme (About) sadeleştirildi:** kısa tanıtım + büyüme notu + Instagram @ardaowski + teşekkür.
 - **Sohbette katılım bildirimleri:** biri odaya girince/çıkınca/atılınca sohbete "{ad} katıldı /
   ayrıldı / atıldı" sistem satırı (avatarıyla) düşer. **Supabase Realtime Presence** ile üretilir
   (`openRoomPresence`) — anlık, iOS+Android'de aynı, sınırsız gir/çık döngüsüne dayanıklı, DB/RLS

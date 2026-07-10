@@ -1,48 +1,49 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Icon, IconName } from '@/components/icons';
+import { Icon, PressableScale, Wordmark } from '@/components';
 import { palette, radius, spacing, typography } from '@/theme';
 
-const VALUES: { icon: IconName; title: string; body: string }[] = [
-  { icon: 'lock', title: 'Gizlilik önce', body: 'Kimlik bilgilerin asla ASTERA’dan geçmez.' },
-  { icon: 'sparkle', title: 'Sinematik deneyim', body: 'Apple kalitesinde, sade ve premium tasarım.' },
-  { icon: 'users', title: 'Birlikte, her yerde', body: 'Arkadaşlarınla senkronize izleme keyfi.' },
-];
-
-/** App identity, tagline and guiding principles. */
+/** App identity, a short note, and where to follow along. Kept intentionally
+ *  light — the product speaks for itself. */
 export function AboutSheet() {
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
-        <View style={styles.logo}>
-          <Icon name="film" size={34} color={palette.amberBright} />
+        <View style={styles.emblem}>
+          <Icon name="sparkle" size={26} color={palette.amberBright} filled />
         </View>
-        <Text style={[typography.title2, styles.brand]}>ASTERA</Text>
-        <Text style={[typography.subhead, styles.tagline]}>Watch Together. Anywhere.</Text>
-        <Text style={[typography.caption1, styles.version]}>Sürüm 1.0.0 (MVP)</Text>
+        <Wordmark size={30} />
+        <Text style={[typography.subhead, styles.tagline]}>Birlikte izleyin, her yerde.</Text>
+        <Text style={[typography.caption1, styles.version]}>Sürüm 1.0.0</Text>
       </View>
 
       <Text style={[typography.body, styles.desc]}>
-        ASTERA, arkadaşlarınla senkronize izleme deneyimi sunar. Film, dizi ve video içeriklerini
-        birlikte izle, sohbet et ve anları paylaş — tıpkı aynı odadaymışsınız gibi.
+        ASTERA, arkadaşlarınla ve sevdiklerinle aynı anı paylaşman için. Bir oda aç, davet et,
+        birlikte izleyin — kilometreler önemli olmasın.
       </Text>
 
-      <View style={styles.values}>
-        {VALUES.map((v) => (
-          <View key={v.title} style={styles.value}>
-            <View style={styles.valueIcon}>
-              <Icon name={v.icon} size={18} color={palette.amber} />
-            </View>
-            <View style={styles.valueText}>
-              <Text style={[typography.subheadEmphasized, styles.valueTitle]}>{v.title}</Text>
-              <Text style={[typography.footnote, styles.valueBody]}>{v.body}</Text>
-            </View>
-          </View>
-        ))}
+      <View style={styles.note}>
+        <Icon name="sparkle" size={16} color={palette.amber} />
+        <Text style={[typography.footnote, styles.noteText]}>
+          Her geçen gün büyüyoruz. Yeni platform desteği ve özellikler yolda.
+        </Text>
       </View>
 
-      <Text style={[typography.caption1, styles.credit]}>Made with ♥ · © 2026 ASTERA</Text>
+      <PressableScale
+        onPress={() => Linking.openURL('https://instagram.com/ardaowski')}
+        activeScale={0.98}
+        accessibilityLabel="Instagram: ardaowski"
+      >
+        <View style={styles.linkRow}>
+          <Text style={[typography.body, styles.linkText]}>Instagram</Text>
+          <Text style={[typography.bodyEmphasized, styles.handle]}>@ardaowski</Text>
+          <Icon name="chevron-right" size={17} color={palette.textTertiary} />
+        </View>
+      </PressableScale>
+
+      <Text style={[typography.footnote, styles.thanks]}>Denediğin için teşekkürler. 🤍</Text>
+      <Text style={[typography.caption1, styles.credit]}>© 2026 ASTERA</Text>
     </ScrollView>
   );
 }
@@ -54,12 +55,12 @@ const styles = StyleSheet.create({
   },
   hero: {
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     marginBottom: spacing.xl,
   },
-  logo: {
-    width: 76,
-    height: 76,
+  emblem: {
+    width: 72,
+    height: 72,
     borderRadius: radius.xl,
     backgroundColor: palette.accentTintSoft,
     alignItems: 'center',
@@ -68,56 +69,38 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: palette.glassBorder,
   },
-  brand: {
-    color: palette.textPrimary,
-    letterSpacing: 3,
-  },
-  tagline: {
-    color: palette.amber,
-  },
-  version: {
-    color: palette.textTertiary,
-    marginTop: 2,
-  },
+  tagline: { color: palette.amber, marginTop: 2 },
+  version: { color: palette.textTertiary, marginTop: 2 },
   desc: {
     color: palette.textSecondary,
     textAlign: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
-  values: {
-    alignSelf: 'stretch',
-    gap: spacing.sm,
-  },
-  value: {
+  note: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
+    alignSelf: 'stretch',
     padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: palette.accentTintSoft,
+    marginBottom: spacing.md,
+  },
+  noteText: { flex: 1, color: palette.textSecondary },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    alignSelf: 'stretch',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
     borderRadius: radius.md,
     backgroundColor: palette.surfaceSecondary,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: palette.glassBorder,
   },
-  valueIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.sm,
-    backgroundColor: palette.accentTintSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  valueText: {
-    flex: 1,
-    gap: 1,
-  },
-  valueTitle: {
-    color: palette.textPrimary,
-  },
-  valueBody: {
-    color: palette.textSecondary,
-  },
-  credit: {
-    color: palette.textTertiary,
-    marginTop: spacing.xl,
-  },
+  linkText: { flex: 1, color: palette.textPrimary },
+  handle: { color: palette.amber },
+  thanks: { color: palette.textSecondary, marginTop: spacing.xl },
+  credit: { color: palette.textTertiary, marginTop: spacing.sm },
 });

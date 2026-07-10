@@ -30,7 +30,7 @@ import {
   type Participant,
   type Room,
 } from '@/data';
-import { addWatchMinutes, isBackendConfigured, kickMember, useAuth, useMyId, useRoomSession } from '@/backend';
+import { addWatchMinutes, isBackendConfigured, kickMember, leaveRoom, useAuth, useMyId, useRoomSession } from '@/backend';
 import { palette, radius, spacing, typography } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 import { InviteFriendsSheet } from './sheets';
@@ -286,7 +286,13 @@ export function RoomScreen({ navigation, route }: Props) {
       <AuthGateModal
         visible={authGate}
         onClose={() => setAuthGate(false)}
-        onLogin={() => { setAuthGate(false); navigation.navigate('Login'); }}
+        onLogin={() => {
+          setAuthGate(false);
+          // Leave the room as the current (anonymous) user before the session
+          // switches, so the stale viewer doesn't linger in the room count.
+          if (backendRoomId) leaveRoom(backendRoomId);
+          navigation.navigate('Login');
+        }}
       />
     </ScreenBackground>
   );

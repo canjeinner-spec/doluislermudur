@@ -90,8 +90,6 @@ export function ProfileScreen({ navigation }: Props) {
         <GlassSurface borderRadius={radius.lg} intensity={24} style={styles.block}>
           <Row icon="globe" label="E-posta" value={email ?? 'Anonim hesap'} />
           <View style={styles.divider} />
-          <Row icon="person-add" label="Kullanıcı adı" value={handle} />
-          <View style={styles.divider} />
           <Row icon="sparkle" label="Üyelik" value={memberSince(profile?.created_at)} />
           <View style={styles.divider} />
           <Row icon="eye" label="Geçirilen süre" value={formatWatch(profile?.minutes_watched ?? 0)} />

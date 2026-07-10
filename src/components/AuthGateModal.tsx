@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -25,6 +26,7 @@ export function AuthGateModal({
 }: Props) {
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+      <GestureHandlerRootView style={styles.root}>
       <View style={styles.backdrop}>
         <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
         <View style={styles.card}>
@@ -47,11 +49,13 @@ export function AuthGateModal({
           </PressableScale>
         </View>
       </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   backdrop: {
     flex: 1,
     alignItems: 'center',

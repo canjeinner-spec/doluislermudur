@@ -16,18 +16,19 @@ const TR_MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temm
 
 export function ProfileEditScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { profile } = useMyProfile();
+  const { profile, refresh } = useMyProfile();
   const { isAnonymous } = useAuth();
 
   const [name, setName] = useState('');
-  const [handle, setHandleText] = useState('');
+  // Handle is edited WITHOUT the leading "@" — it's shown as a fixed prefix.
+  const [handleName, setHandleName] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     if (profile) {
       setName(profile.display_name);
-      setHandleText(profile.handle);
+      setHandleName(profile.handle.replace(/^@/, ''));
     }
   }, [profile]);
 
@@ -39,18 +40,22 @@ export function ProfileEditScreen({ navigation }: Props) {
   const save = async () => {
     setMsg(null);
     setBusy(true);
+    // Display name (independent of the handle, so it always saves).
     if (name.trim() && name.trim() !== profile?.display_name) {
       await updateDisplayName(name.trim());
     }
-    const h = handle.trim();
-    if (!isAnonymous && !handleLocked && h && h !== profile?.handle) {
-      const res = await setHandle(h);
+    // Handle only when it actually changed and isn't on cooldown.
+    const orig = (profile?.handle ?? '').replace(/^@/, '').toLowerCase();
+    const next = handleName.trim().toLowerCase();
+    if (!isAnonymous && !handleLocked && next && next !== orig) {
+      const res = await setHandle(next);
       if (!res.ok) {
         setBusy(false);
         setMsg({ ok: false, text: res.error ?? 'Kullanıcı adı güncellenemedi' });
         return;
       }
     }
+    await refresh(); // pull fresh values (locks the handle field for 7 days)
     setBusy(false);
     setMsg({ ok: true, text: 'Değişiklikler kaydedildi' });
   };
@@ -104,9 +109,10 @@ export function ProfileEditScreen({ navigation }: Props) {
           ) : (
             <>
               <TextField
-                value={handle}
-                onChangeText={setHandleText}
-                placeholder="@kullanici_adi"
+                value={handleName}
+                onChangeText={(t) => setHandleName(t.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase())}
+                prefix="@"
+                placeholder="kullanici_adi"
                 icon="person-add"
                 autoCapitalize="none"
                 editable={!handleLocked}

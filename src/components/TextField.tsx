@@ -21,6 +21,8 @@ type Props = {
   secureTextEntry?: boolean;
   keyboardType?: TextInputProps['keyboardType'];
   autoCapitalize?: TextInputProps['autoCapitalize'];
+  /** Fixed, non-editable text shown before the input (e.g. "@"). */
+  prefix?: string;
 };
 
 /** Rounded field with a focus ring that warms to the accent color. */
@@ -41,6 +43,7 @@ export function TextField({
   secureTextEntry,
   keyboardType,
   autoCapitalize,
+  prefix,
 }: Props) {
   const [focused, setFocused] = useState(false);
 
@@ -64,6 +67,7 @@ export function TextField({
           color={focused ? palette.amber : palette.textTertiary}
         />
       )}
+      {prefix != null && <Text style={[typography.body, styles.prefix]}>{prefix}</Text>}
       <TextInput
         style={[styles.input, typography.body, multiline && styles.inputMultiline]}
         value={value}
@@ -120,6 +124,10 @@ const styles = StyleSheet.create({
     flex: 1,
     color: palette.textPrimary,
     paddingVertical: 0,
+  },
+  prefix: {
+    color: palette.textSecondary,
+    marginRight: -4,
   },
   inputMultiline: {
     minHeight: 58,

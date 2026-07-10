@@ -5,16 +5,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import {
-  GlassSurface,
   Icon,
   IconButton,
+  ListRow,
   NavBar,
-  PlatformWordmark,
-  PressableScale,
+  PlatformLogo,
   ScreenBackground,
 } from '@/components';
 import { PLATFORMS } from '@/data';
-import { palette, radius, spacing, typography } from '@/theme';
+import { palette, spacing, typography } from '@/theme';
 import { storage, StorageKeys } from '@/storage/storage';
 import type { RootStackParamList } from '@/navigation/types';
 
@@ -68,11 +67,13 @@ export function PlatformSelectScreen({ navigation, route }: Props) {
               .includes(p.id);
             return (
               <Animated.View key={p.id} entering={FadeInDown.delay(i * 40).springify().damping(18)}>
-                <PressableScale onPress={() => onSelect(p.id)} activeScale={0.98} accessibilityLabel={p.name}>
-                  <GlassSurface borderRadius={radius.lg} intensity={24} style={styles.row}>
-                    <View style={styles.logoWrap}>
-                      <PlatformWordmark id={p.id} />
-                    </View>
+                <ListRow
+                  size="lg"
+                  title={p.name}
+                  subtitle={p.description}
+                  leading={<PlatformLogo id={p.id} size={46} />}
+                  onPress={() => onSelect(p.id)}
+                  trailing={
                     <View style={styles.trailing}>
                       {authed && (
                         <View style={styles.authedChip}>
@@ -81,8 +82,8 @@ export function PlatformSelectScreen({ navigation, route }: Props) {
                       )}
                       <Icon name="chevron-right" size={18} color={palette.textTertiary} strokeWidth={2.2} />
                     </View>
-                  </GlassSurface>
-                </PressableScale>
+                  }
+                />
               </Animated.View>
             );
           })}
@@ -107,16 +108,6 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: spacing.md,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
-  },
-  logoWrap: {
-    flex: 1,
-    justifyContent: 'center',
   },
   trailing: {
     flexDirection: 'row',

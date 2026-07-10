@@ -23,5 +23,5 @@ export { Sidebar } from './Sidebar';
 export type { SidebarDestination } from './Sidebar';
 export { Icon } from './icons';
 export type { IconName } from './icons';
-export { PlatformLogo, MaxMark, PlatformWordmark } from './icons';
+export { PlatformLogo, MaxMark } from './icons';
 export type { PlatformId } from './icons';

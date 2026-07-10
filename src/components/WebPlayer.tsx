@@ -117,7 +117,12 @@ export function WebPlayer({ uri, userAgent, platform, fill, onToggleFullscreen, 
   const vimeoUri = React.useMemo(() => toVimeo(uri), [uri]);
   const controller = React.useMemo(() => buildController(platform ?? ''), [platform]);
 
-  const [playing, setPlaying] = useState(true);
+  // For YouTube, `playing` starts false and is flipped to true in onReady — that
+  // change is what injects playVideo *after* the player exists. It then tracks
+  // user intent only; we deliberately do NOT sync it from the player's own state
+  // changes, or a transient buffer/pause would make us re-inject pauseVideo and
+  // fight playback (the "plays for a moment then force-pauses" bug on Android).
+  const [playing, setPlaying] = useState(!ytId);
   // YouTube starts muted so autoplay isn't blocked, then we unmute on play.
   const [muted, setMuted] = useState<boolean>(!!extractYouTubeId(uri));
   const didUnmute = useRef(false);
@@ -315,20 +320,16 @@ export function WebPlayer({ uri, userAgent, platform, fill, onToggleFullscreen, 
                   /* ignore */
                 }
                 setHasVideo(true);
-                // Nudge playback — the `play` prop alone often won't autostart on
-                // mobile; a seek kicks it off (muted, so the browser allows it).
+                // Kick playback now that the player exists: flip intent true so
+                // the (patched) play effect injects playVideo once, cleanly.
+                setPlaying(true);
+                // A seek also helps some devices start a muted video.
                 setTimeout(() => ytRef.current?.seekTo(0, true), 250);
-                // Android frequently ignores the initial autoplay and sits paused.
-                // Re-assert play once the player is live so the (patched) play
-                // effect injects playVideo again.
-                if (Platform.OS === 'android') {
-                  setPlaying(false);
-                  setTimeout(() => setPlaying(true), 350);
-                }
               }}
               onChangeState={(s: string) => {
+                // Reflect readiness + handle iOS unmute, but never write back to
+                // `playing` — that would fight the user's intent and force pauses.
                 if (s === 'playing') {
-                  setPlaying(true);
                   setHasVideo(true);
                   // Bring the sound up once playback has begun — iOS only. On
                   // Android, auto-unmuting a programmatically-started video trips
@@ -338,8 +339,6 @@ export function WebPlayer({ uri, userAgent, platform, fill, onToggleFullscreen, 
                     didUnmute.current = true;
                     setTimeout(() => setMuted(false), 350);
                   }
-                } else if (s === 'paused' || s === 'ended') {
-                  setPlaying(false);
                 }
               }}
               webViewStyle={styles.ytWeb}

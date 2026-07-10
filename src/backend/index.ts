@@ -3,6 +3,7 @@ export { isBackendConfigured } from './config';
 export {
   ensureSession,
   updateDisplayName,
+  uploadAvatar,
   fetchMyProfile,
   emailExists,
   signIn,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { Image, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { palette } from '@/theme';
@@ -9,6 +9,8 @@ type Props = {
   tint: string;
   size?: number;
   online?: boolean;
+  /** When set, shows an uploaded photo instead of the monogram. */
+  imageUrl?: string | null;
   /** Ring color to separate overlapping avatars (defaults to background). */
   ringColor?: string;
   ringWidth?: number;
@@ -27,6 +29,7 @@ export function Avatar({
   tint,
   size = 34,
   online,
+  imageUrl,
   ringColor = palette.background,
   ringWidth = 0,
   style,
@@ -48,21 +51,31 @@ export function Avatar({
           },
         ]}
       >
-        <LinearGradient
-          colors={[shade(tint, 0.22), shade(tint, -0.16)]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[StyleSheet.absoluteFill, { borderRadius: size / 2 }]}
-        />
-        <Text
-          style={[
-            styles.text,
-            { fontSize, lineHeight: fontSize + 2 },
-          ]}
-          allowFontScaling={false}
-        >
-          {initials(name)}
-        </Text>
+        {imageUrl ? (
+          <Image
+            source={{ uri: imageUrl }}
+            style={[StyleSheet.absoluteFill, { borderRadius: size / 2 }]}
+            resizeMode="cover"
+          />
+        ) : (
+          <>
+            <LinearGradient
+              colors={[shade(tint, 0.22), shade(tint, -0.16)]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[StyleSheet.absoluteFill, { borderRadius: size / 2 }]}
+            />
+            <Text
+              style={[
+                styles.text,
+                { fontSize, lineHeight: fontSize + 2 },
+              ]}
+              allowFontScaling={false}
+            >
+              {initials(name)}
+            </Text>
+          </>
+        )}
       </View>
       {online != null && (
         <View

@@ -26,6 +26,7 @@ istatistikleri var.
 | Backend | Supabase (Auth, Postgres, RLS, Realtime, RPC) |
 | Senkron | Supabase Realtime **Broadcast** (host-otoriter) + `postgres_changes` (chat/roster) |
 | Oynatıcı | react-native-youtube-iframe (patch-package ile play/mute), react-native-webview |
+| Medya | expo-image-picker (profil fotoğrafı) + Supabase Storage |
 | Animasyon | react-native-reanimated, react-native-gesture-handler |
 
 Backend `isBackendConfigured` arkasında; yapılandırılmadıysa mock veriye düşer.
@@ -54,7 +55,8 @@ Backend `isBackendConfigured` arkasında; yapılandırılmadıysa mock veriye d�
 ## 4. Backend (`src/backend`) ve SQL
 
 - **auth.ts** — `emailExists`, `signIn`, `register` (anonim→kalıcı yükseltme + sağlam profil),
-  `setHandle` (7 gün cooldown), `signOut`, `deleteAccount`, `updateDisplayName`, `fetchMyProfile`.
+  `setHandle` (7 gün cooldown), `signOut`, `deleteAccount`, `updateDisplayName`, `uploadAvatar`
+  (galeriden foto → Storage → `avatar_url`), `fetchMyProfile`.
 - **rooms.ts** — `createRoom`, `joinRoom`, `leaveRoom(roomId, userId?)`, `currentUserId`,
   `updateRoomContent`, `kickMember`, `inviteByHandle`, `addWatchMinutes`, `fetch*`,
   `sendMessage`, `subscribe*` (postgres_changes kanalları benzersiz suffix'li), `thumbnailFor`.
@@ -69,6 +71,8 @@ Backend `isBackendConfigured` arkasında; yapılandırılmadıysa mock veriye d�
 - `004_room_thumbnail.sql` — `thumbnail_url` kolonu.
 - `005_profile.sql` — `bump_rooms_hosted` trigger, `delete_account` RPC.
 - `006_watch_time.sql` — `add_watch_minutes` RPC.
+- `007_avatar_upload.sql` — `profiles.avatar_url` kolonu + public `avatars` Storage bucket'ı
+  + storage RLS (herkes okur, kullanıcı yalnızca kendi klasörüne yazar).
 
 > ⚠️ **Yapılacak:** 002–006 migration'larının Supabase SQL editöründe çalıştırıldığından
 > emin ol. E-posta onayı (confirm mail) **kapalı** olmalı (doğrulandı).
@@ -86,7 +90,11 @@ Backend `isBackendConfigured` arkasında; yapılandırılmadıysa mock veriye d�
   Host değilse controller kapalı (sadece izler).
 - Sohbet: gerçek zamanlı, efemeral (geç gelen/çıkıp giren için temizlenmiş başlar).
 - Kick + ban + davet (@handle ile) + banlı kullanıcı tekrar giremez.
-- Profil: DB'den gerçek veriler; düzenleme (ad, @handle 7 gün kilidi); çıkış; hesap silme.
+- Profil: DB'den gerçek veriler; düzenleme (ad, @handle 7 gün kilidi).
+- **Profil fotoğrafı yükleme** — galeriden seç (expo-image-picker) → Supabase Storage `avatars`
+  bucket'ına yükle → `avatar_url` profile yaz; avatar her yerde resmi gösterir.
+- **Çıkış Yap + Hesabı Sil**, düzenleme ekranından alınıp Profil'de "HIZLI İŞLEMLER"e taşındı;
+  düzenleme ekranı artık foto + ad + @handle + Kaydet/İptal odaklı.
 - İzleme süresi sayacı (dakikada +1) ve "geçirilen süre" / "kurulan oda" istatistikleri.
 - **Odada giriş yap → aynı odaya yeni hesapla dön** (eski anonim izleyici sayımda kalmaz).
 - Platform logoları: koyu karo kaldırıldı, şeffaf SVG sembol logolar (Netflix/YouTube/Prime/
@@ -101,18 +109,17 @@ Backend `isBackendConfigured` arkasında; yapılandırılmadıysa mock veriye d�
   iframe jesti gerektirdiği için enjeksiyonla çözülemiyor → **native dev build**'e ertelendi.
 - **Netflix / Prime DRM** — Widevine/FairPlay; Expo Go/WebView'de tam oynatma yok →
   native dev build gerekiyor.
-- **Avatar yükleme** (kayıtlı kullanıcı) — Supabase Storage bucket gerekiyor, henüz başlanmadı.
 - Google Drive için "wordmark" logo yok (sadece üçgen sembol).
 
 ---
 
 ## 7. Kalan işler / sıradaki adımlar 📋
 
-1. Migration'ları (002–006) Supabase'de çalıştır ve prod'da doğrula.
+1. **`007_avatar_upload.sql`'i Supabase SQL editöründe çalıştır** (bucket + kolon + policy) —
+   avatar yükleme bunsuz "bucket not found" verir. 002–006 zaten doğrulandı ✅.
 2. Native dev build al → Android ses + Netflix/Prime DRM'i gerçek cihazda test et.
-3. Avatar yükleme (Storage bucket + upload akışı).
-4. Oda içi "kimler izliyor" ve host devri uç durumlarının cihazda testi.
-5. Yayın öncesi: hata/analitik, boş durum ekranları, ince tasarım geçişleri.
+3. Oda içi "kimler izliyor" ve host devri uç durumlarının cihazda testi.
+4. Yayın öncesi: hata/analitik, boş durum ekranları, ince tasarım geçişleri.
 
 ---
 

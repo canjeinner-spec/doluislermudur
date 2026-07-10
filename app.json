@@ -36,6 +36,12 @@
           "ios": { "deploymentTarget": "15.1" },
           "android": { "minSdkVersion": 24 }
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Astera profil fotoğrafını değiştirmek için galerine erişmek istiyor."
+        }
       ]
     ]
   }

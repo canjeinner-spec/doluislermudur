@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -73,6 +73,10 @@ export function HomeScreen({ navigation }: Props) {
       message: 'Profilini görebilmek ve düzenleyebilmek için giriş yapmış olman gerekiyor.',
     },
   } as const;
+  // Keep the last reason so the modal doesn't flash the default copy while it
+  // fades out (that "second message" appearing after).
+  const lastGate = useRef<'create' | 'profile'>('create');
+  if (gate) lastGate.current = gate;
 
   const { rooms: liveRooms, refresh } = useRooms();
   const source = isBackendConfigured ? liveRooms : ROOMS;
@@ -100,17 +104,25 @@ export function HomeScreen({ navigation }: Props) {
         left={
           <IconButton
             icon="info"
-            iconSize={24}
+            iconSize={28}
             variant="plain"
             accessibilityLabel="Hakkında"
             onPress={() => setSheet('about')}
           />
         }
-        titleNode={<Text style={styles.brand}>ASTERA</Text>}
+        titleNode={
+          <View style={styles.wordmark}>
+            {['A', 'S', 'T', 'E', 'R', 'A'].map((c, i) => (
+              <Text key={i} style={[styles.brandLetter, i === 4 && styles.brandMirror]}>
+                {c}
+              </Text>
+            ))}
+          </View>
+        }
         right={
           <IconButton
             icon="users"
-            iconSize={24}
+            iconSize={28}
             variant="plain"
             accessibilityLabel="Profil"
             onPress={openProfile}
@@ -213,34 +225,22 @@ export function HomeScreen({ navigation }: Props) {
         visible={gate !== null}
         onClose={() => setGate(null)}
         onLogin={() => { setGate(null); navigation.navigate('Login'); }}
-        title={gate ? GATE_COPY[gate].title : undefined}
-        message={gate ? GATE_COPY[gate].message : undefined}
+        title={GATE_COPY[lastGate.current].title}
+        message={GATE_COPY[lastGate.current].message}
       />
     </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  wordmark: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  logoDot: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
-    backgroundColor: palette.accentTintSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brand: {
-    ...typography.title3,
-    fontSize: 21,
-    color: palette.textPrimary,
-    letterSpacing: 3.5,
+  wordmark: { flexDirection: 'row', alignItems: 'center' },
+  brandLetter: {
+    fontSize: 23,
     fontWeight: '800',
+    color: palette.textPrimary,
+    marginHorizontal: 1.7,
   },
+  brandMirror: { transform: [{ scaleX: -1 }] },
   list: {
     paddingHorizontal: spacing.lg,
   },

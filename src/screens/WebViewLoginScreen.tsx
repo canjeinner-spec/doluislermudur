@@ -156,7 +156,11 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
       return;
     }
 
-    // New room: persist it so it shows up in everyone's list, then open it.
+    // New room: persist it, then open it with a clean stack so leaving the room
+    // returns to the room list — not back through platform-select / sign-in.
+    const openFresh = (params: RootStackParamList['Room']) =>
+      navigation.reset({ index: 1, routes: [{ name: 'Home' }, { name: 'Room', params }] });
+
     if (isBackendConfigured) {
       const room = await createRoom({
         title: cleaned,
@@ -167,11 +171,11 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
         isPublic: draft.isPublic,
       });
       if (room) {
-        navigation.replace('Room', { roomId: room.id });
+        openFresh({ roomId: room.id });
         return;
       }
     }
-    navigation.replace('Room', localParams);
+    openFresh(localParams);
   };
 
   // The probe tells us content is actually playing → hand off to the room with

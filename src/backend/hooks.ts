@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import type { Participant, Room } from '@/data';
 
@@ -20,32 +20,32 @@ import {
 } from './rooms';
 
 /** Live, member-count-sorted list of all rooms. Empty when backend is off. */
-export function useRooms(): { rooms: Room[]; loading: boolean } {
+export function useRooms(): { rooms: Room[]; loading: boolean; refresh: () => void } {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(isBackendConfigured);
+
+  const refresh = useCallback(async () => {
+    if (!isBackendConfigured) return;
+    const rows = await fetchRooms();
+    setRooms(rows.map((r) => toRoom(r)));
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     if (!isBackendConfigured) {
       setLoading(false);
       return;
     }
-    let alive = true;
-    const load = async () => {
-      const rows = await fetchRooms();
-      if (alive) {
-        setRooms(rows.map((r) => toRoom(r)));
-        setLoading(false);
-      }
-    };
-    load();
-    const unsub = subscribeRooms(load);
+    refresh();
+    // Realtime covers member-count changes; a ban doesn't touch the rooms table,
+    // so the list is also refreshed on screen focus (see HomeScreen).
+    const unsub = subscribeRooms(refresh);
     return () => {
-      alive = false;
       unsub();
     };
-  }, []);
+  }, [refresh]);
 
-  return { rooms, loading };
+  return { rooms, loading, refresh };
 }
 
 /** The signed-in user's id (null until resolved / when backend is off). */

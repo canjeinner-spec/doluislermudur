@@ -198,9 +198,11 @@ create policy profiles_upsert on public.profiles for insert to authenticated wit
 drop policy if exists profiles_update on public.profiles;
 create policy profiles_update on public.profiles for update to authenticated using (id = auth.uid());
 
--- Rooms: every room is listable; only the host mutates room rows.
+-- Rooms: listable to everyone EXCEPT users kicked/banned from that room (they
+-- stop seeing it until invite_member clears their ban); only the host mutates.
 drop policy if exists rooms_read on public.rooms;
-create policy rooms_read on public.rooms for select to authenticated using (true);
+create policy rooms_read on public.rooms for select to authenticated
+  using (not public.is_banned(id, auth.uid()));
 drop policy if exists rooms_insert on public.rooms;
 create policy rooms_insert on public.rooms for insert to authenticated with check (host_id = auth.uid());
 drop policy if exists rooms_update on public.rooms;

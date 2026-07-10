@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -6,6 +6,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import {
@@ -49,8 +50,12 @@ export function HomeScreen({ navigation }: Props) {
   const [query, setQuery] = useState('');
   const [sheet, setSheet] = useState<SheetKey | null>(null);
 
-  const { rooms: liveRooms } = useRooms();
+  const { rooms: liveRooms, refresh } = useRooms();
   const source = isBackendConfigured ? liveRooms : ROOMS;
+
+  // Refresh when returning to the list (e.g. after being kicked, so a room you
+  // were banned from disappears).
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
   const rooms = useMemo(() => {
     const q = query.trim().toLowerCase();

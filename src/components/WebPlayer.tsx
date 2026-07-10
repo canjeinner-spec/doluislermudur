@@ -318,6 +318,13 @@ export function WebPlayer({ uri, userAgent, platform, fill, onToggleFullscreen, 
                 // Nudge playback — the `play` prop alone often won't autostart on
                 // mobile; a seek kicks it off (muted, so the browser allows it).
                 setTimeout(() => ytRef.current?.seekTo(0, true), 250);
+                // Android frequently ignores the initial autoplay and sits paused.
+                // Re-assert play once the player is live so the (patched) play
+                // effect injects playVideo again.
+                if (Platform.OS === 'android') {
+                  setPlaying(false);
+                  setTimeout(() => setPlaying(true), 350);
+                }
               }}
               onChangeState={(s: string) => {
                 if (s === 'playing') {

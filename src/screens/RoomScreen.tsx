@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import Animated, {
@@ -83,6 +83,7 @@ export function RoomScreen({ navigation, route }: Props) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [usersOpen, setUsersOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [chatTop, setChatTop] = useState(0);
 
   const usersProgress = useSharedValue(0);
   const openUsers = () => {
@@ -166,6 +167,10 @@ export function RoomScreen({ navigation, route }: Props) {
             fullscreen={fullscreen}
             onToggleFullscreen={toggleFullscreen}
           />
+        ) : session.loading ? (
+          <View style={styles.playerLoading}>
+            <ActivityIndicator color={palette.amber} />
+          </View>
         ) : (
           <VideoPlayer posterIndex={room.posterIndex} fill={fullscreen} />
         )}
@@ -173,7 +178,14 @@ export function RoomScreen({ navigation, route }: Props) {
 
       {/* Chat fills the rest of the screen */}
       {!fullscreen && (
-        <ChatView bottomInset={insets.bottom} nowPlaying={room.title} onChangeContent={changeContent} />
+        <View style={styles.chatWrap} onLayout={(e) => setChatTop(e.nativeEvent.layout.y)}>
+          <ChatView
+            bottomInset={insets.bottom}
+            nowPlaying={room.title}
+            onChangeContent={changeContent}
+            keyboardOffset={chatTop}
+          />
+        </View>
       )}
 
       {/* Fullscreen exit (works for any player) */}
@@ -240,7 +252,15 @@ const styles = StyleSheet.create({
   title: { color: palette.textPrimary, maxWidth: 180 },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   sub: { color: palette.textSecondary },
+  chatWrap: { flex: 1 },
   playerWrap: { width: '100%' },
+  playerLoading: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: palette.black,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   playerFull: {
     position: 'absolute',
     top: 0,

@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -10,8 +10,9 @@ import {
 } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path } from 'react-native-svg';
 
-import { Avatar, Icon, IconButton, PressableScale } from '@/components';
+import { Avatar, Icon, PressableScale } from '@/components';
 import { CHAT_SEED, CURRENT_USER, type ChatMessage } from '@/data';
 import { palette, radius, spacing, typography } from '@/theme';
 
@@ -20,18 +21,35 @@ type Props = {
   nowPlaying: string;
   inviteCode?: string;
   onChangeContent?: () => void;
+  /** Distance from the top of the screen to the chat — keeps the composer above
+   *  the keyboard on both platforms. */
+  keyboardOffset?: number;
 };
 
+type Row = { message: ChatMessage; grouped: boolean };
+
+function SendArrow() {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 19V6M6 12l6-6 6 6"
+        stroke={palette.white}
+        strokeWidth={2.3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 /**
- * Rave-style chat: bubble-less messages floating on a warm gradient. Other
- * people sit on the left with an avatar + name; the local user's lines are
- * right-aligned plain text. System notices (now-playing, invite, joins) are
- * woven into the stream.
+ * Rave-style chat: bubble-less messages floating on a warm gradient, anchored to
+ * the bottom (newest at the bottom, growing upward) via an inverted list. The
+ * whole thing lifts above the keyboard.
  */
-export function ChatView({ bottomInset, nowPlaying, inviteCode = '8F3K2Q', onChangeContent }: Props) {
+export function ChatView({ bottomInset, nowPlaying, inviteCode = '8F3K2Q', onChangeContent, keyboardOffset = 0 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>(CHAT_SEED);
   const [draft, setDraft] = useState('');
-  const listRef = useRef<FlatList<ChatMessage>>(null);
 
   const send = useCallback(() => {
     const text = draft.trim();
@@ -47,27 +65,41 @@ export function ChatView({ bottomInset, nowPlaying, inviteCode = '8F3K2Q', onCha
     };
     setMessages((prev) => [...prev, msg]);
     setDraft('');
-    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   }, [draft]);
 
+  // Inverted list wants newest first; precompute grouping in chronological order.
+  const data = useMemo<Row[]>(() => {
+    const rows = messages.map((m, i) => ({
+      message: m,
+      grouped: messages[i - 1]?.authorId === m.authorId && messages[i - 1]?.mine === m.mine,
+    }));
+    return rows.reverse();
+  }, [messages]);
+
   return (
-    <View style={styles.root}>
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior="padding"
+      keyboardVerticalOffset={keyboardOffset}
+    >
       {/* Warm cinematic wash behind the chat, like Rave's album-art bleed. */}
       <LinearGradient
         colors={['rgba(122,74,44,0.28)', 'rgba(60,37,23,0.16)', 'rgba(9,9,9,0)']}
-        start={{ x: 0.2, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
+        start={{ x: 0.2, y: 1 }}
+        end={{ x: 0.9, y: 0 }}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
 
       <FlatList
-        ref={listRef}
-        data={messages}
-        keyExtractor={(m) => m.id}
+        data={data}
+        inverted
+        keyExtractor={(r) => r.message.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
-        ListHeaderComponent={
+        keyboardShouldPersistTaps="handled"
+        renderItem={({ item }) => <MessageRow message={item.message} grouped={item.grouped} />}
+        ListFooterComponent={
           <View style={styles.header}>
             <View style={styles.systemRow}>
               <Icon name="sparkle" size={14} color={palette.amber} filled />
@@ -91,52 +123,36 @@ export function ChatView({ bottomInset, nowPlaying, inviteCode = '8F3K2Q', onCha
             </View>
           </View>
         }
-        renderItem={({ item, index }) => (
-          <MessageRow message={item} prev={messages[index - 1]} />
-        )}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={90}
-      >
-        <View style={[styles.composer, { paddingBottom: bottomInset + spacing.sm }]}>
-          <View style={styles.micBtn}>
-            <Icon name="volume" size={19} color={palette.background} />
-          </View>
-          <View style={styles.inputPill}>
-            <TextInput
-              style={[typography.body, styles.input]}
-              value={draft}
-              onChangeText={setDraft}
-              placeholder="Sohbet"
-              placeholderTextColor={palette.textTertiary}
-              selectionColor={palette.amber}
-              cursorColor={palette.amber}
-              keyboardAppearance="dark"
-              multiline
-              onSubmitEditing={send}
-              blurOnSubmit={false}
-              returnKeyType="send"
-            />
-            <IconButton icon="emoji" size={30} iconSize={19} variant="plain" color={palette.textTertiary} accessibilityLabel="Emoji" />
-            <IconButton icon="attach" size={30} iconSize={18} variant="plain" color={palette.textTertiary} accessibilityLabel="Ekle" />
-          </View>
-          <PressableScale onPress={send} activeScale={0.88} disabled={!draft.trim()} accessibilityLabel="Gönder">
-            <View style={[styles.send, !draft.trim() && styles.sendDisabled]}>
-              <Icon name="send" size={19} color={palette.white} filled />
-            </View>
-          </PressableScale>
+      <View style={[styles.composer, { paddingBottom: bottomInset + spacing.sm }]}>
+        <View style={styles.inputPill}>
+          <TextInput
+            style={[typography.body, styles.input]}
+            value={draft}
+            onChangeText={setDraft}
+            placeholder="Mesaj yaz…"
+            placeholderTextColor={palette.textTertiary}
+            selectionColor={palette.amber}
+            cursorColor={palette.amber}
+            keyboardAppearance="dark"
+            multiline
+            onSubmitEditing={send}
+            blurOnSubmit={false}
+            returnKeyType="send"
+          />
         </View>
-      </KeyboardAvoidingView>
-    </View>
+        <PressableScale onPress={send} activeScale={0.88} disabled={!draft.trim()} accessibilityLabel="Gönder">
+          <View style={[styles.send, !draft.trim() && styles.sendDisabled]}>
+            <SendArrow />
+          </View>
+        </PressableScale>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
-function MessageRow({ message, prev }: { message: ChatMessage; prev?: ChatMessage }) {
-  const grouped = prev?.authorId === message.authorId && prev?.mine === message.mine;
-
+function MessageRow({ message, grouped }: { message: ChatMessage; grouped: boolean }) {
   if (message.mine) {
     return (
       <Animated.View entering={FadeIn.duration(160)} style={styles.mineRow}>
@@ -162,13 +178,14 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   list: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
     gap: spacing.md,
   },
   header: {
     gap: spacing.md,
-    marginBottom: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
   systemRow: {
     flexDirection: 'row',
@@ -210,21 +227,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
   },
-  micBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: palette.textPrimary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   inputPill: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 44,
-    paddingLeft: spacing.lg,
-    paddingRight: spacing.xs,
+    paddingHorizontal: spacing.lg,
     borderRadius: radius.xl,
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: StyleSheet.hairlineWidth,

@@ -9,7 +9,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { Icon, IconButton, NavBar, PressableScale, ScreenBackground } from '@/components';
+import { Icon, IconButton, NavBar, ScreenBackground } from '@/components';
 import { getPlatform, userAgentFor } from '@/data';
 import { palette, spacing, typography } from '@/theme';
 import { storage, StorageKeys } from '@/storage/storage';
@@ -180,13 +180,6 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
             </Text>
           </View>
         }
-        right={
-          <PressableScale onPress={() => finish()} accessibilityLabel="Odaya geç">
-            <View style={styles.goBtn}>
-              <Icon name="chevron-right" size={22} color={palette.white} strokeWidth={2.4} />
-            </View>
-          </PressableScale>
-        }
       />
 
       <View
@@ -274,14 +267,6 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  goBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: palette.copper,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   addressBar: {
     flexDirection: 'row',
     alignItems: 'center',

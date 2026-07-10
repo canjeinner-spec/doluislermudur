@@ -52,10 +52,22 @@ const PLAYBACK_PROBE = `
       }
     }
   }
+  // Grab the page's Open Graph image/title (Netflix/Prime/Drive) so the room
+  // card can show a real banner + name, like YouTube's.
+  var lastMeta='';
+  function grabMeta(){
+    try{
+      var g=function(p){var e=document.querySelector('meta[property="'+p+'"]')||document.querySelector('meta[name="'+p+'"]');return e?e.getAttribute('content')||'':'';};
+      var img=g('og:image'); var ttl=g('og:title');
+      var key=img+'|'+ttl;
+      if((img||ttl)&&key!==lastMeta){ lastMeta=key; RNW.postMessage(JSON.stringify({t:'meta',image:img,title:ttl})); }
+    }catch(e){}
+  }
   document.addEventListener('play',announce,true);
   document.addEventListener('playing',announce,true);
   document.addEventListener('loadeddata',announce,true);
   setInterval(announce,700);
+  setInterval(grabMeta,900); grabMeta();
 })();
 true;
 `;
@@ -107,6 +119,8 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
   const progress = useSharedValue(0);
   const pageTitleRef = useRef('');
   const pageUrlRef = useRef(platform?.loginUrl ?? '');
+  const ogImageRef = useRef('');
+  const ogTitleRef = useRef('');
   const finishedRef = useRef(false);
 
   const finish = async (url?: string, title?: string) => {
@@ -118,18 +132,23 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
     }
     let cleaned = cleanTitle(title ?? pageTitleRef.current, platform?.name) || platform?.name || 'Oda';
     const contentUrl = url ?? pageUrlRef.current;
-    // For YouTube the page title is frequently still "YouTube" at hand-off, so
-    // pull the real video title from oEmbed.
+    let thumbnailUrl: string | null = null;
     if (isYouTubeUrl(contentUrl)) {
+      // Page title is often still "YouTube" at hand-off → use oEmbed; thumbnail
+      // is derived from the video id on the card side.
       const yt = await youtubeTitle(contentUrl);
       if (yt) cleaned = yt.slice(0, 80);
+    } else {
+      // Netflix/Prime/Drive: use the page's og:title / og:image.
+      if (ogTitleRef.current) cleaned = cleanTitle(ogTitleRef.current, platform?.name) || cleaned;
+      if (ogImageRef.current) thumbnailUrl = ogImageRef.current;
     }
     const localParams = { draft, platformId, title: cleaned, contentUrl };
 
     // Changing content in an existing room: update it and pop back.
     if (route.params.returnToRoom) {
       if (isBackendConfigured && route.params.roomId) {
-        await updateRoomContent(route.params.roomId, contentUrl, cleaned);
+        await updateRoomContent(route.params.roomId, contentUrl, cleaned, thumbnailUrl);
         navigation.navigate('Room', { roomId: route.params.roomId });
       } else {
         navigation.navigate('Room', localParams);
@@ -144,6 +163,7 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
         platform: platformId,
         platformLabel: platform?.name ?? '',
         contentUrl,
+        thumbnailUrl,
         isPublic: draft.isPublic,
       });
       if (room) {
@@ -159,7 +179,10 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
   const onProbeMessage = (e: WebViewMessageEvent) => {
     try {
       const msg = JSON.parse(e.nativeEvent.data);
-      if (msg.t === 'playing' && typeof msg.url === 'string') {
+      if (msg.t === 'meta') {
+        if (typeof msg.image === 'string' && msg.image) ogImageRef.current = msg.image;
+        if (typeof msg.title === 'string' && msg.title) ogTitleRef.current = msg.title;
+      } else if (msg.t === 'playing' && typeof msg.url === 'string') {
         finish(msg.url, msg.title);
       }
     } catch {

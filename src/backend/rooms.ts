@@ -41,7 +41,7 @@ export function toRoom(r: RoomRow, participants: Participant[] = []): Room {
     participantCount: r.member_count,
     maxParticipants: r.max_participants,
     posterIndex: posterFor(r.id),
-    thumbnailUrl: thumbnailFor(r.content_url),
+    thumbnailUrl: r.thumbnail_url ?? thumbnailFor(r.content_url),
     participants,
   };
 }
@@ -108,6 +108,7 @@ export async function createRoom(input: {
   platform: string;
   platformLabel: string;
   contentUrl?: string | null;
+  thumbnailUrl?: string | null;
   isPublic: boolean;
 }): Promise<RoomRow | null> {
   if (!supabase) return null;
@@ -121,6 +122,7 @@ export async function createRoom(input: {
       platform: input.platform,
       platform_label: input.platformLabel,
       content_url: input.contentUrl ?? null,
+      thumbnail_url: input.thumbnailUrl ?? null,
       host_id: me,
       is_public: input.isPublic,
     })
@@ -158,9 +160,17 @@ export async function leaveRoom(roomId: string): Promise<void> {
   await supabase.from('room_members').delete().eq('room_id', roomId).eq('user_id', me);
 }
 
-export async function updateRoomContent(roomId: string, contentUrl: string, title: string): Promise<void> {
+export async function updateRoomContent(
+  roomId: string,
+  contentUrl: string,
+  title: string,
+  thumbnailUrl?: string | null
+): Promise<void> {
   if (!supabase) return;
-  await supabase.from('rooms').update({ content_url: contentUrl, title }).eq('id', roomId);
+  await supabase
+    .from('rooms')
+    .update({ content_url: contentUrl, title, thumbnail_url: thumbnailUrl ?? null })
+    .eq('id', roomId);
 }
 
 export type MessageWithAuthor = MessageRow & {

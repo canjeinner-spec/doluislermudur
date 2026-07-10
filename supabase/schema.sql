@@ -31,6 +31,7 @@ create table if not exists public.rooms (
   platform         text not null,
   platform_label   text not null default '',
   content_url      text,
+  thumbnail_url    text,
   host_id          uuid not null references public.profiles (id) on delete cascade,
   is_public        boolean not null default true,
   status           text not null default 'watching',

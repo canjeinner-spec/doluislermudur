@@ -25,6 +25,7 @@ export type RoomRow = {
   platform: string;
   platform_label: string;
   content_url: string | null;
+  thumbnail_url: string | null;
   host_id: string;
   is_public: boolean;
   status: 'watching' | 'waiting';

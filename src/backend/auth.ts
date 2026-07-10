@@ -108,10 +108,14 @@ export async function register(email: string, password: string, displayName: str
   }
   if (error) return error.message;
   const name = displayName.trim();
+  if (name) storage.setString(StorageKeys.displayName, name);
+  // Guarantee a profile row exists (with a handle) for this user, then set the
+  // chosen display name. Doing a raw upsert here could fail because handle is
+  // NOT NULL — ensureSession creates it properly.
+  await ensureSession();
   if (name) {
-    storage.setString(StorageKeys.displayName, name);
     const { data: { user: u } } = await supabase.auth.getUser();
-    if (u) await supabase.from('profiles').upsert({ id: u.id, display_name: name }, { onConflict: 'id' });
+    if (u) await supabase.from('profiles').update({ display_name: name }).eq('id', u.id);
   }
   return null; // success
 }

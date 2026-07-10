@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   runOnJS,
@@ -110,7 +110,18 @@ function buildController(platform: string): string {
 `;
 }
 
-export function WebPlayer({ uri, userAgent, platform, fill, onToggleFullscreen, fullscreen, onControl }: Props) {
+/** Imperative surface used by the playback-sync layer to drive followers. */
+export type WebPlayerHandle = {
+  play: () => void;
+  pause: () => void;
+  seek: (time: number) => void;
+  getInfo: () => { time: number; playing: boolean };
+};
+
+export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
+  { uri, userAgent, platform, fill, onToggleFullscreen, fullscreen, onControl },
+  ref
+) {
   const webRef = useRef<WebView>(null);
   const ytRef = useRef<YoutubeIframeRef>(null);
   const ytId = React.useMemo(() => extractYouTubeId(uri), [uri]);
@@ -193,8 +204,32 @@ export function WebPlayer({ uri, userAgent, platform, fill, onToggleFullscreen, 
     if (ytId) ytRef.current?.seekTo(next, true);
     else applyWeb({ type: 'seekBy', delta });
     setPosition(next);
+    onControl?.({ type: 'seek', time: next });
     showControls();
   };
+
+  // Imperative surface for the sync layer: apply remote host commands locally
+  // WITHOUT firing onControl (followers must not echo back into the room).
+  useImperativeHandle(
+    ref,
+    () => ({
+      play: () => {
+        setPlaying(true);
+        if (!ytId) applyWeb({ type: 'play' });
+      },
+      pause: () => {
+        setPlaying(false);
+        if (!ytId) applyWeb({ type: 'pause' });
+      },
+      seek: (time: number) => {
+        if (ytId) ytRef.current?.seekTo(time, true);
+        else applyWeb({ type: 'seek', time });
+        setPosition(time);
+      },
+      getInfo: () => ({ time: position, playing }),
+    }),
+    [ytId, applyWeb, position, playing]
+  );
 
   const toggleMute = () => {
     const next = !muted;
@@ -451,7 +486,7 @@ export function WebPlayer({ uri, userAgent, platform, fill, onToggleFullscreen, 
       </Animated.View>
     </View>
   );
-}
+});
 
 function ControlButton({
   icon,

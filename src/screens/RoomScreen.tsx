@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -19,6 +19,7 @@ import {
   ScreenBackground,
   VideoPlayer,
   WebPlayer,
+  type WebPlayerHandle,
 } from '@/components';
 import {
   CURRENT_USER,
@@ -34,6 +35,7 @@ import type { RootStackParamList } from '@/navigation/types';
 import { InviteFriendsSheet } from './sheets';
 import { ChatView } from './room/ChatView';
 import { UsersPanel } from './room/UsersPanel';
+import { usePlaybackSync } from './room/usePlaybackSync';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Room'>;
 
@@ -80,6 +82,13 @@ export function RoomScreen({ navigation, route }: Props) {
   const room = session.room ?? localRoom;
   const contentUrl = session.room ? session.contentUrl : route.params.contentUrl;
   const participants = session.room ? session.participants : room.participants;
+
+  // Host-authoritative playback sync. You're the host of a room you created (or
+  // any local/mock room); once the backend promotes a new host, isHost updates.
+  const backend = isBackendConfigured && !!backendRoomId;
+  const isHost = !backend || session.hostId === myId;
+  const playerRef = useRef<WebPlayerHandle>(null);
+  const sync = usePlaybackSync({ roomId: backendRoomId, isHost, enabled: backend, playerRef });
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [usersOpen, setUsersOpen] = useState(false);
@@ -160,6 +169,7 @@ export function RoomScreen({ navigation, route }: Props) {
       <View style={[styles.playerWrap, fullscreen && styles.playerFull]}>
         {contentUrl ? (
           <WebPlayer
+            ref={playerRef}
             key={contentUrl}
             uri={contentUrl}
             platform={room.platform}
@@ -167,6 +177,7 @@ export function RoomScreen({ navigation, route }: Props) {
             fill={fullscreen}
             fullscreen={fullscreen}
             onToggleFullscreen={toggleFullscreen}
+            onControl={sync.broadcastControl}
           />
         ) : session.loading ? (
           <View style={styles.playerLoading}>

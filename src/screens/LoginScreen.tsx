@@ -70,8 +70,14 @@ export function LoginScreen({ navigation }: Props) {
 
   const back = () => {
     setError(null);
-    if (step === 'email') navigation.goBack();
-    else setStep('email');
+    if (step !== 'email') {
+      setStep('email');
+      return;
+    }
+    // Reached login straight from onboarding (which was replaced) → nothing to
+    // go back to, so drop into the app as an anonymous viewer.
+    if (navigation.canGoBack()) navigation.goBack();
+    else navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   };
 
   return (

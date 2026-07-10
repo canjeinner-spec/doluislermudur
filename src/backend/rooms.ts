@@ -153,6 +153,41 @@ export async function updateRoomContent(roomId: string, contentUrl: string, titl
   await supabase.from('rooms').update({ content_url: contentUrl, title }).eq('id', roomId);
 }
 
+export type MessageWithAuthor = MessageRow & {
+  author: Pick<ProfileRow, 'display_name' | 'avatar_tint'> | null;
+};
+
+export async function fetchMessages(roomId: string): Promise<MessageWithAuthor[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*, author:profiles(display_name, avatar_tint)')
+    .eq('room_id', roomId)
+    .order('created_at', { ascending: true })
+    .limit(200);
+  if (error) {
+    console.warn('[astera] fetchMessages:', error.message);
+    return [];
+  }
+  return (data ?? []) as unknown as MessageWithAuthor[];
+}
+
+export async function sendMessage(roomId: string, text: string): Promise<MessageRow | null> {
+  if (!supabase) return null;
+  const me = await uid();
+  if (!me) return null;
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({ room_id: roomId, author_id: me, text })
+    .select('*')
+    .single();
+  if (error) {
+    console.warn('[astera] sendMessage:', error.message);
+    return null;
+  }
+  return data;
+}
+
 /** Host removes a member and bans them until re-invited. */
 export async function kickMember(roomId: string, userId: string): Promise<void> {
   if (!supabase) return;

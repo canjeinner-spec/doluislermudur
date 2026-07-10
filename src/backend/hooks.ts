@@ -4,6 +4,7 @@ import type { Participant, Room } from '@/data';
 
 import { isBackendConfigured } from './config';
 import { fetchMyProfile } from './auth';
+import { supabase } from './supabase';
 import type { ProfileRow } from './types';
 import {
   fetchMembers,
@@ -45,6 +46,16 @@ export function useRooms(): { rooms: Room[]; loading: boolean } {
   }, []);
 
   return { rooms, loading };
+}
+
+/** The signed-in user's id (null until resolved / when backend is off). */
+export function useMyId(): string | null {
+  const [id, setId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getUser().then(({ data }) => setId(data.user?.id ?? null));
+  }, []);
+  return id;
 }
 
 /** The signed-in user's own profile row, live-ish (refetched on mount). */

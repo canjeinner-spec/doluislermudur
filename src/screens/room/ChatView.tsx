@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -13,7 +13,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
 
 import { Avatar, Icon, PressableScale } from '@/components';
-import { CHAT_SEED, CURRENT_USER, type ChatMessage } from '@/data';
+import { CHAT_SEED, CURRENT_USER, type ChatMessage, type Participant } from '@/data';
+import {
+  fetchMessages,
+  isBackendConfigured,
+  sendMessage,
+  subscribeMessages,
+  type MessageRow,
+  type MessageWithAuthor,
+} from '@/backend';
 import { palette, radius, spacing, typography } from '@/theme';
 
 type Props = {
@@ -24,7 +32,40 @@ type Props = {
   /** Distance from the top of the screen to the chat — keeps the composer above
    *  the keyboard on both platforms. */
   keyboardOffset?: number;
+  /** Backend room id — when set (and backend configured), chat is live. */
+  roomId?: string;
+  myId?: string | null;
+  participants?: Participant[];
 };
+
+function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function joinedToChat(m: MessageWithAuthor, myId?: string | null): ChatMessage {
+  return {
+    id: m.id,
+    authorId: m.author_id,
+    authorName: m.author_id === myId ? 'Sen' : m.author?.display_name ?? 'İzleyici',
+    tint: m.author?.avatar_tint ?? palette.copper,
+    text: m.text,
+    time: fmtTime(m.created_at),
+    mine: m.author_id === myId,
+  };
+}
+
+function rowToChat(m: MessageRow, myId?: string | null, participants?: Participant[]): ChatMessage {
+  const p = participants?.find((x) => x.id === m.author_id);
+  return {
+    id: m.id,
+    authorId: m.author_id,
+    authorName: m.author_id === myId ? 'Sen' : p?.name ?? 'İzleyici',
+    tint: p?.tint ?? palette.copper,
+    text: m.text,
+    time: fmtTime(m.created_at),
+    mine: m.author_id === myId,
+  };
+}
 
 type Row = { message: ChatMessage; grouped: boolean };
 
@@ -47,13 +88,53 @@ function SendArrow() {
  * the bottom (newest at the bottom, growing upward) via an inverted list. The
  * whole thing lifts above the keyboard.
  */
-export function ChatView({ bottomInset, nowPlaying, inviteCode = '8F3K2Q', onChangeContent, keyboardOffset = 0 }: Props) {
-  const [messages, setMessages] = useState<ChatMessage[]>(CHAT_SEED);
+export function ChatView({
+  bottomInset,
+  nowPlaying,
+  inviteCode = '8F3K2Q',
+  onChangeContent,
+  keyboardOffset = 0,
+  roomId,
+  myId,
+  participants,
+}: Props) {
+  const backend = isBackendConfigured && !!roomId;
+  const [messages, setMessages] = useState<ChatMessage[]>(backend ? [] : CHAT_SEED);
   const [draft, setDraft] = useState('');
+
+  // Live messages from the backend: initial load + realtime inserts (deduped,
+  // so our own echoed insert doesn't appear twice).
+  useEffect(() => {
+    if (!backend || !roomId) return;
+    let alive = true;
+    fetchMessages(roomId).then((rows) => {
+      if (alive) setMessages(rows.map((m) => joinedToChat(m, myId)));
+    });
+    const unsub = subscribeMessages(roomId, (row) => {
+      setMessages((prev) =>
+        prev.some((x) => x.id === row.id) ? prev : [...prev, rowToChat(row, myId, participants)]
+      );
+    });
+    return () => {
+      alive = false;
+      unsub();
+    };
+  }, [backend, roomId, myId, participants]);
 
   const send = useCallback(() => {
     const text = draft.trim();
     if (!text) return;
+    setDraft('');
+    if (backend && roomId) {
+      sendMessage(roomId, text).then((row) => {
+        if (row) {
+          setMessages((prev) =>
+            prev.some((x) => x.id === row.id) ? prev : [...prev, rowToChat(row, myId, participants)]
+          );
+        }
+      });
+      return;
+    }
     const msg: ChatMessage = {
       id: `m${Date.now()}`,
       authorId: CURRENT_USER.id,
@@ -64,8 +145,7 @@ export function ChatView({ bottomInset, nowPlaying, inviteCode = '8F3K2Q', onCha
       mine: true,
     };
     setMessages((prev) => [...prev, msg]);
-    setDraft('');
-  }, [draft]);
+  }, [draft, backend, roomId, myId, participants]);
 
   // Inverted list wants newest first; precompute grouping in chronological order.
   const data = useMemo<Row[]>(() => {

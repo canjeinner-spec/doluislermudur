@@ -28,7 +28,7 @@ import {
   type Participant,
   type Room,
 } from '@/data';
-import { isBackendConfigured, useRoomSession } from '@/backend';
+import { isBackendConfigured, useMyId, useRoomSession } from '@/backend';
 import { palette, radius, spacing, typography } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 import { InviteFriendsSheet } from './sheets';
@@ -75,6 +75,7 @@ export function RoomScreen({ navigation, route }: Props) {
   // locally-synthesised room from the create flow.
   const backendRoomId = isBackendConfigured ? route.params.roomId : undefined;
   const session = useRoomSession(backendRoomId);
+  const myId = useMyId();
   const localRoom = useRoom(route.params);
   const room = session.room ?? localRoom;
   const contentUrl = session.room ? session.contentUrl : route.params.contentUrl;
@@ -184,6 +185,9 @@ export function RoomScreen({ navigation, route }: Props) {
             nowPlaying={room.title}
             onChangeContent={changeContent}
             keyboardOffset={chatTop}
+            roomId={backendRoomId}
+            myId={myId}
+            participants={participants}
           />
         </View>
       )}

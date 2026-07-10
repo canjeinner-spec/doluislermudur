@@ -11,9 +11,13 @@ export {
   fetchRooms,
   fetchRoom,
   fetchMembers,
+  fetchMessages,
+  sendMessage,
+  subscribeMessages,
   toRoom,
 } from './rooms';
-export { useRooms, useRoomSession, useMyProfile } from './hooks';
+export type { MessageWithAuthor } from './rooms';
+export { useRooms, useRoomSession, useMyProfile, useMyId } from './hooks';
 export type { RoomSession } from './hooks';
 export type {
   AuthedUser,

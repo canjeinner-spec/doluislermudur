@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -36,6 +36,8 @@ type Props = {
   roomId?: string;
   myId?: string | null;
   participants?: Participant[];
+  /** Only load history once we've actually joined (RLS needs membership). */
+  ready?: boolean;
 };
 
 function fmtTime(iso: string): string {
@@ -99,29 +101,38 @@ export function ChatView({
   roomId,
   myId,
   participants,
+  ready = true,
 }: Props) {
   const backend = isBackendConfigured && !!roomId;
   const [messages, setMessages] = useState<ChatMessage[]>(backend ? [] : CHAT_SEED);
   const [draft, setDraft] = useState('');
 
-  // Live messages from the backend: initial load + realtime inserts (deduped,
-  // so our own echoed insert doesn't appear twice).
+  // Keep the latest roster available to the realtime handler without making it
+  // a dependency (which would tear down/rebuild the subscription constantly).
+  const participantsRef = useRef(participants);
   useEffect(() => {
-    if (!backend || !roomId) return;
+    participantsRef.current = participants;
+  }, [participants]);
+
+  // Live messages from the backend: load history once we've joined (RLS needs
+  // membership, otherwise a late joiner fetches nothing → empty chat), then
+  // apply realtime inserts (deduped so our own echo doesn't appear twice).
+  useEffect(() => {
+    if (!backend || !roomId || !ready) return;
     let alive = true;
     fetchMessages(roomId).then((rows) => {
       if (alive) setMessages(rows.map((m) => joinedToChat(m, myId)));
     });
     const unsub = subscribeMessages(roomId, (row) => {
       setMessages((prev) =>
-        prev.some((x) => x.id === row.id) ? prev : [...prev, rowToChat(row, myId, participants)]
+        prev.some((x) => x.id === row.id) ? prev : [...prev, rowToChat(row, myId, participantsRef.current)]
       );
     });
     return () => {
       alive = false;
       unsub();
     };
-  }, [backend, roomId, myId, participants]);
+  }, [backend, roomId, myId, ready]);
 
   const send = useCallback(() => {
     const text = draft.trim();

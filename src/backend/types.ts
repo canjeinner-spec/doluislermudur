@@ -119,4 +119,6 @@ export interface AuthedUser {
 export type SyncEvent =
   | { kind: 'control'; action: 'play' | 'pause' | 'seek'; time: number; at: number }
   | { kind: 'heartbeat'; time: number; paused: boolean; at: number }
-  | { kind: 'content'; url: string; title: string; at: number };
+  | { kind: 'content'; url: string; title: string; at: number }
+  // A follower asks the host to push its current state right now (on join).
+  | { kind: 'request'; at: number };

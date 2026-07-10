@@ -46,28 +46,53 @@ export function usePlaybackSync({ roomId, isHost, enabled, playerRef }: Args) {
     const client = supabase;
     const ch = client.channel(`sync:${roomId}`, { config: { broadcast: { self: false } } });
 
+    const pushState = () => {
+      const info = playerRef.current?.getInfo();
+      if (!info) return;
+      ch.send({
+        type: 'broadcast',
+        event: 'sync',
+        payload: { kind: 'heartbeat', time: info.time, paused: !info.playing, at: Date.now() },
+      });
+    };
+
     ch.on('broadcast', { event: 'sync' }, ({ payload }) => {
-      if (isHost) return; // the host drives; it doesn't follow
-      applyRemote(payload as SyncEvent, playerRef.current);
+      const p = payload as SyncEvent;
+      if (isHost) {
+        // Answer a new joiner immediately with the current position.
+        if (p.kind === 'request') pushState();
+        return; // the host drives; it doesn't follow
+      }
+      applyRemote(p, playerRef.current);
     });
-    ch.subscribe();
+
+    let reqTimer: ReturnType<typeof setInterval> | undefined;
+    ch.subscribe((status) => {
+      // On joining, a follower asks the host for the current state right away
+      // (instead of waiting up to a full heartbeat). We re-ask a few times over
+      // the first few seconds because the player often isn't ready to seek on
+      // the very first reply, which is what made late joiners start from ~0.
+      if (status === 'SUBSCRIBED' && !isHost) {
+        const req = () =>
+          ch.send({ type: 'broadcast', event: 'sync', payload: { kind: 'request', at: Date.now() } });
+        req();
+        let tries = 0;
+        reqTimer = setInterval(() => {
+          req();
+          if (++tries >= 4 && reqTimer) {
+            clearInterval(reqTimer);
+            reqTimer = undefined;
+          }
+        }, 1200);
+      }
+    });
     chanRef.current = ch;
 
-    let heartbeat: ReturnType<typeof setInterval> | undefined;
-    if (isHost) {
-      heartbeat = setInterval(() => {
-        const info = playerRef.current?.getInfo();
-        if (!info) return;
-        ch.send({
-          type: 'broadcast',
-          event: 'sync',
-          payload: { kind: 'heartbeat', time: info.time, paused: !info.playing, at: Date.now() },
-        });
-      }, 2500);
-    }
+    const heartbeat = isHost ? setInterval(pushState, 2500) : undefined;
 
     return () => {
       if (heartbeat) clearInterval(heartbeat);
+      if (reqTimer) clearInterval(reqTimer);
       client.removeChannel(ch);
       chanRef.current = null;
     };

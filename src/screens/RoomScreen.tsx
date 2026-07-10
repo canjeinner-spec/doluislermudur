@@ -199,6 +199,7 @@ export function RoomScreen({ navigation, route }: Props) {
             roomId={backendRoomId}
             myId={myId}
             participants={participants}
+            ready={!session.loading}
           />
         </View>
       )}

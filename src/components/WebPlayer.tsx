@@ -1,5 +1,5 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -156,31 +156,15 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
   const controlsOpacity = useSharedValue(1);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Controls stay up: our overlay is box-none, so the YouTube iframe beneath it
+  // still receives taps (needed for "Skip Ad"). Auto-hiding + a full-screen
+  // touch-catcher used to swallow those taps, which is why ads couldn't be
+  // skipped on Android.
   const showControls = useCallback(() => {
     setControlsVisible(true);
     controlsOpacity.value = withTiming(1, { duration: 150 });
     if (hideTimer.current) clearTimeout(hideTimer.current);
-    // Only the (non-interactive) YouTube player auto-hides; WebView pages keep
-    // controls up so the site underneath stays reachable.
-    if (ytId) {
-      hideTimer.current = setTimeout(() => {
-        controlsOpacity.value = withTiming(0, { duration: 350 }, (f) => {
-          if (f) runOnJS(setControlsVisible)(false);
-        });
-      }, 3200);
-    }
-  }, [controlsOpacity, ytId]);
-
-  const toggleControls = useCallback(() => {
-    if (controlsVisible) {
-      if (hideTimer.current) clearTimeout(hideTimer.current);
-      controlsOpacity.value = withTiming(0, { duration: 220 }, (f) => {
-        if (f) runOnJS(setControlsVisible)(false);
-      });
-    } else {
-      showControls();
-    }
-  }, [controlsVisible, controlsOpacity, showControls]);
+  }, [controlsOpacity]);
 
   useEffect(() => {
     showControls();
@@ -339,9 +323,11 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
       style={[styles.container, fill && styles.containerFill]}
       onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
     >
-      {/* Media layer */}
+      {/* Media layer. For YouTube the iframe stays touch-enabled so the viewer
+          can hit YouTube's own "Skip Ad" button (our overlay is box-none, so
+          empty areas fall through to it). */}
       {ytId ? (
-        <View style={styles.ytLayer} pointerEvents="none">
+        <View style={styles.ytLayer}>
           {box.w > 0 && (
             <YoutubePlayer
               ref={ytRef}
@@ -413,16 +399,6 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
           setSupportMultipleWindows={false}
           userAgent={userAgent}
           allowsBackForwardNavigationGestures={false}
-        />
-      )}
-
-      {/* Tap the video to toggle controls. Plain RN Pressable so it doesn't
-          fight the Gesture-Handler control buttons layered above it. */}
-      {ytId && (
-        <Pressable
-          onPress={toggleControls}
-          style={StyleSheet.absoluteFill}
-          accessibilityLabel="Kontroller"
         />
       )}
 

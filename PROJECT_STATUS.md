@@ -103,8 +103,11 @@ Backend `isBackendConfigured` arkasında; yapılandırılmadıysa mock veriye d�
 - **Kazara oda çıkışı engellendi:** kaydırma jesti kapalı; çıkış yalnızca sol üst X ile ve
   "emin misin?" onayıyla (Android donanım geri tuşu da onaydan geçer; kick istisna).
 - **Sohbette katılım bildirimleri:** biri odaya girince/çıkınca/atılınca sohbete "{ad} katıldı /
-  ayrıldı / atıldı" sistem satırı (avatarıyla) düşer. Roster diff'i ile üretilir; kick vs ayrılma
-  RoomScreen'in kicked-id seti ile ayrılır. Kendi katılışın ve baştan orada olanlar için bildirim çıkmaz.
+  ayrıldı / atıldı" sistem satırı (avatarıyla) düşer. **Supabase Realtime Presence** ile üretilir
+  (`openRoomPresence`) — anlık, iOS+Android'de aynı, sınırsız gir/çık döngüsüne dayanıklı, DB/RLS
+  teslimatına bağlı değil. Bir üyenin hareketi **yalnızca diğerlerinin** akışında görünür (kendi
+  katılışını görmezsin); baştan odada olanlar sessizce seed edilir. Profil düzenleyince (`update()`)
+  yanlışlıkla "ayrıldı/katıldı" üretmez. Kick vs ayrılma RoomScreen'in kicked-id seti ile ayrılır.
 - İzleme süresi sayacı (dakikada +1) ve "geçirilen süre" / "kurulan oda" istatistikleri.
 - **Odada giriş yap → aynı odaya yeni hesapla dön** (eski anonim izleyici sayımda kalmaz).
 - Platform logoları: koyu karo kaldırıldı, şeffaf SVG sembol logolar (Netflix/YouTube/Prime/

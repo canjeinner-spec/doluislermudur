@@ -16,9 +16,11 @@ import { Avatar, Icon, PressableScale } from '@/components';
 import { CHAT_SEED, CURRENT_USER, type ChatMessage, type Participant } from '@/data';
 import {
   isBackendConfigured,
+  openRoomPresence,
   sendMessage,
   subscribeMessages,
   type MessageRow,
+  type PresenceUser,
 } from '@/backend';
 import { palette, radius, spacing, typography } from '@/theme';
 
@@ -129,39 +131,63 @@ export function ChatView({
     });
   }, [participants]);
 
-  // Presence notices: diff the live roster to announce who joined / left / was
-  // kicked. The first loaded roster is the baseline (no notices for people
-  // already here, nor for our own join). Kicks are told apart from leaves via
-  // the kicked-id set the room screen fills in.
-  const rosterRef = useRef<Map<string, Participant> | null>(null);
+  // Presence notices: a member's join/leave/kick shows up in *everyone else's*
+  // feed (never your own — you don't announce yourself). Driven by a Realtime
+  // Presence channel so it's instant and reliable on both iOS and Android, and
+  // survives any number of leave/rejoin cycles. My own identity for the channel
+  // comes from my row in the live roster.
+  const meParticipant = participants?.find((p) => p.id === myId);
+  const meName = meParticipant?.name;
+  const meAvatar = meParticipant?.avatarUrl ?? null;
+  const meTint = meParticipant?.tint;
+  const identityReady = !!(myId && meName);
+
+  const pushNotice = useCallback((u: PresenceUser, kind: 'join' | 'leave' | 'kick') => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `sys-${kind}-${u.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        authorId: u.id,
+        authorName: u.name,
+        tint: u.tint,
+        avatarUrl: u.avatarUrl ?? null,
+        text: '',
+        time: '',
+        system: kind,
+      },
+    ]);
+  }, []);
+
+  const presenceRef = useRef<{ update: (m: PresenceUser) => void; close: () => void } | null>(null);
   useEffect(() => {
-    if (!backend || !ready || !participants) return;
-    const cur = new Map(participants.map((p) => [p.id, p]));
-    const prev = rosterRef.current;
-    rosterRef.current = cur;
-    if (prev === null) return; // baseline snapshot — seed only
+    if (!backend || !roomId || !identityReady || !myId || !meName) return;
+    const handle = openRoomPresence(
+      roomId,
+      { id: myId, name: meName, avatarUrl: meAvatar, tint: meTint ?? palette.copper },
+      {
+        onJoin: (u) => pushNotice(u, 'join'),
+        onLeave: (u) => {
+          const kicked = kickedIdsRef?.current?.has(u.id) ?? false;
+          if (kicked) kickedIdsRef?.current?.delete(u.id);
+          pushNotice(u, kicked ? 'kick' : 'leave');
+        },
+      }
+    );
+    presenceRef.current = handle;
+    return () => {
+      handle.close();
+      presenceRef.current = null;
+    };
+    // Only (re)subscribe when the room or *whether* we have an identity changes —
+    // NOT on every name/photo edit (that would read as a leave+rejoin to others).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backend, roomId, identityReady, pushNotice, kickedIdsRef]);
 
-    const notices: ChatMessage[] = [];
-    const notice = (p: Participant, kind: 'join' | 'leave' | 'kick'): ChatMessage => ({
-      id: `sys-${kind}-${p.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      authorId: p.id,
-      authorName: p.name,
-      tint: p.tint,
-      avatarUrl: p.avatarUrl ?? null,
-      text: '',
-      time: '',
-      system: kind,
-    });
-
-    for (const [id, p] of cur) if (!prev.has(id)) notices.push(notice(p, 'join'));
-    for (const [id, p] of prev) {
-      if (cur.has(id)) continue;
-      const kicked = kickedIdsRef?.current?.has(id) ?? false;
-      if (kicked) kickedIdsRef?.current?.delete(id);
-      notices.push(notice(p, kicked ? 'kick' : 'leave'));
-    }
-    if (notices.length) setMessages((m) => [...m, ...notices]);
-  }, [participants, ready, backend, kickedIdsRef]);
+  // Push name/photo edits into the live presence state without re-subscribing.
+  useEffect(() => {
+    if (!identityReady || !myId || !meName) return;
+    presenceRef.current?.update({ id: myId, name: meName, avatarUrl: meAvatar, tint: meTint ?? palette.copper });
+  }, [identityReady, myId, meName, meAvatar, meTint]);
 
   // Chat is ephemeral: no history is loaded. You only see messages posted while
   // you're in the room, so anyone who left (or left and rejoined) starts clean.

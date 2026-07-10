@@ -292,6 +292,70 @@ export function subscribeMembers(roomId: string, onChange: () => void): () => vo
 }
 
 /**
+ * Live join/leave presence for a room, over a Realtime **Presence** channel
+ * (not postgres_changes). Each client tracks its own identity; every *other*
+ * client is told when it joins or leaves — instantly, on both platforms, and
+ * independent of DB replication/RLS timing. Members already present when you
+ * arrive are seeded silently (no "joined" spam), and updating your own identity
+ * (name/photo edit) via `update()` never reads as a leave/join to others.
+ */
+export type PresenceUser = { id: string; name: string; avatarUrl: string | null; tint: string };
+
+export function openRoomPresence(
+  roomId: string,
+  me: PresenceUser,
+  handlers: { onJoin: (u: PresenceUser) => void; onLeave: (u: PresenceUser) => void }
+): { update: (next: PresenceUser) => void; close: () => void } {
+  if (!supabase) return { update: () => {}, close: () => {} };
+  const client = supabase;
+  let current = me;
+  const known = new Set<string>();
+  let seeded = false;
+
+  const ch = client.channel(`presence:${roomId}`, { config: { presence: { key: me.id } } });
+
+  ch.on('presence', { event: 'sync' }, () => {
+    // First sync = the people already here → remember them without announcing.
+    if (seeded) return;
+    Object.keys(ch.presenceState()).forEach((k) => known.add(k));
+    seeded = true;
+  });
+  ch.on('presence', { event: 'join' }, ({ key, newPresences }) => {
+    // Self, pre-seed members, and re-tracks of a known key are all silent.
+    if (key === current.id || !seeded || known.has(key)) {
+      known.add(key);
+      return;
+    }
+    known.add(key);
+    const p = newPresences[newPresences.length - 1] as unknown as PresenceUser | undefined;
+    if (p?.id) handlers.onJoin(p);
+  });
+  ch.on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+    if (key === current.id || !known.has(key)) {
+      known.delete(key);
+      return;
+    }
+    known.delete(key);
+    const p = leftPresences[leftPresences.length - 1] as unknown as PresenceUser | undefined;
+    if (p?.id) handlers.onLeave(p);
+  });
+
+  ch.subscribe((status) => {
+    if (status === 'SUBSCRIBED') ch.track(current).catch(() => {});
+  });
+
+  return {
+    update: (next) => {
+      current = next;
+      ch.track(next).catch(() => {});
+    },
+    close: () => {
+      client.removeChannel(ch);
+    },
+  };
+}
+
+/**
  * Fire when *any* profile row changes. Used inside a room so a member editing
  * their name/photo re-flows into everyone's roster and chat in real time.
  * (profiles has no room scope, so we can't filter — the handler just reloads.)

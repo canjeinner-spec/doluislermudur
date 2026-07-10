@@ -123,8 +123,9 @@ export function WebPlayer({ uri, userAgent, platform, fill, onToggleFullscreen, 
   // changes, or a transient buffer/pause would make us re-inject pauseVideo and
   // fight playback (the "plays for a moment then force-pauses" bug on Android).
   const [playing, setPlaying] = useState(!ytId);
-  // YouTube starts muted so autoplay isn't blocked, then we unmute on play.
-  const [muted, setMuted] = useState<boolean>(!!extractYouTubeId(uri));
+  // Muting is applied in onReady (see below) once the player exists — setting it
+  // here would inject player.mute() before the player is created and be lost.
+  const [muted, setMuted] = useState<boolean>(false);
   const didUnmute = useRef(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -320,11 +321,13 @@ export function WebPlayer({ uri, userAgent, platform, fill, onToggleFullscreen, 
                   /* ignore */
                 }
                 setHasVideo(true);
-                // Kick playback now that the player exists: flip intent true so
-                // the (patched) play effect injects playVideo once, cleanly.
-                setPlaying(true);
-                // A seek also helps some devices start a muted video.
-                setTimeout(() => ytRef.current?.seekTo(0, true), 250);
+                // Order matters: mute FIRST (now that the player exists) so
+                // Android permits autoplay, then start playback a tick later.
+                // Injecting both in one render would run playVideo before mute
+                // (the patched effects fire in declaration order), leaving the
+                // video unmuted → Android blocks it → it snaps back to pause.
+                setMuted(true);
+                setTimeout(() => setPlaying(true), 150);
               }}
               onChangeState={(s: string) => {
                 // Reflect readiness + handle iOS unmute, but never write back to

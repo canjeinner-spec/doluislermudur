@@ -13,13 +13,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   AuthGateModal,
   BottomSheet,
-  Icon,
   IconButton,
-  PlatformLogo,
-  PressableScale,
   ScreenBackground,
   VideoPlayer,
   WebPlayer,
+  Wordmark,
   type WebPlayerHandle,
 } from '@/components';
 import {
@@ -207,27 +205,22 @@ export function RoomScreen({ navigation, route }: Props) {
 
   return (
     <ScreenBackground glow="none">
-      {/* Top bar — X + fullscreen · title · invite + participants */}
+      {/* Top bar — X · ASTERA · (change) invite + participants. Bare icons, no
+          chrome; the now-playing / platform info lives under the player. */}
       {!fullscreen && (
         <View style={[styles.topBar, { paddingTop: insets.top + spacing.xs }]}>
           <View style={styles.topSide}>
-            <IconButton icon="close" size={38} variant="glass" accessibilityLabel="Odadan çık" onPress={() => navigation.goBack()} />
-            <IconButton icon="fullscreen" size={38} variant="glass" accessibilityLabel="Tam ekran" onPress={toggleFullscreen} />
+            <IconButton icon="close" size={44} iconSize={26} variant="plain" accessibilityLabel="Odadan çık" onPress={() => navigation.goBack()} />
           </View>
           <View style={styles.titleWrap} pointerEvents="none">
-            <Text style={[typography.subheadEmphasized, styles.title]} numberOfLines={1}>
-              {room.title}
-            </Text>
-            <View style={styles.subRow}>
-              <PlatformLogo id={room.platform} size={12} />
-              <Text style={[typography.caption2, styles.sub]} numberOfLines={1}>
-                {room.platformLabel}
-              </Text>
-            </View>
+            <Wordmark size={22} />
           </View>
           <View style={[styles.topSide, styles.topRight]}>
-            <IconButton icon="person-add" size={38} variant="glass" accessibilityLabel="Davet et" onPress={() => setInviteOpen(true)} />
-            <PressableCount count={count} onPress={openUsers} />
+            {isHost && (
+              <IconButton icon="search" size={44} iconSize={24} variant="plain" accessibilityLabel="İçeriği değiştir" onPress={changeContent} />
+            )}
+            <IconButton icon="person-add" size={44} iconSize={24} variant="plain" accessibilityLabel="Davet et" onPress={() => setInviteOpen(true)} />
+            <IconButton icon="users" size={44} iconSize={24} variant="plain" accessibilityLabel={`Katılımcılar · ${count}`} onPress={openUsers} />
           </View>
         </View>
       )}
@@ -262,7 +255,6 @@ export function RoomScreen({ navigation, route }: Props) {
           <ChatView
             bottomInset={insets.bottom}
             nowPlaying={room.title}
-            onChangeContent={changeContent}
             keyboardOffset={chatTop}
             roomId={backendRoomId}
             myId={myId}
@@ -334,17 +326,6 @@ export function RoomScreen({ navigation, route }: Props) {
   );
 }
 
-function PressableCount({ count, onPress }: { count: number; onPress: () => void }) {
-  return (
-    <PressableScale onPress={onPress} activeScale={0.9} accessibilityLabel={`${count} katılımcı`}>
-      <View style={styles.countBtn}>
-        <Icon name="users" size={18} color={palette.textPrimary} />
-        <Text style={[typography.footnoteEmphasized, styles.countText]}>{count}</Text>
-      </View>
-    </PressableScale>
-  );
-}
-
 const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
@@ -354,12 +335,9 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
     gap: spacing.sm,
   },
-  topSide: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  topSide: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   topRight: { justifyContent: 'flex-end' },
-  titleWrap: { flex: 1, alignItems: 'center', gap: 1 },
-  title: { color: palette.textPrimary, maxWidth: 180 },
-  subRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  sub: { color: palette.textSecondary },
+  titleWrap: { flex: 1, alignItems: 'center' },
   chatWrap: { flex: 1 },
   playerWrap: { width: '100%' },
   playerLoading: {
@@ -415,17 +393,5 @@ const styles = StyleSheet.create({
   },
   usersTitle: { color: palette.textPrimary },
   usersSub: { color: palette.textTertiary, marginTop: 1 },
-  countBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    height: 38,
-    paddingHorizontal: spacing.md,
-    borderRadius: 19,
-    backgroundColor: palette.glass,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: palette.glassBorder,
-  },
-  countText: { color: palette.textPrimary },
 });
 

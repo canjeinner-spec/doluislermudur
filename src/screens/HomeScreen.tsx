@@ -19,6 +19,7 @@ import {
   RoomCard,
   ScreenBackground,
   TextField,
+  Wordmark,
 } from '@/components';
 import { ROOMS } from '@/data';
 import { isBackendConfigured, useAuth, useRooms } from '@/backend';
@@ -110,15 +111,7 @@ export function HomeScreen({ navigation }: Props) {
             onPress={() => setSheet('about')}
           />
         }
-        titleNode={
-          <View style={styles.wordmark}>
-            {['A', 'S', 'T', 'E', 'R', 'A'].map((c, i) => (
-              <Text key={i} style={[styles.brandLetter, i === 4 && styles.brandMirror]}>
-                {c}
-              </Text>
-            ))}
-          </View>
-        }
+        titleNode={<Wordmark size={23} />}
         right={
           <IconButton
             icon="users"
@@ -233,14 +226,6 @@ export function HomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wordmark: { flexDirection: 'row', alignItems: 'center' },
-  brandLetter: {
-    fontSize: 23,
-    fontWeight: '800',
-    color: palette.textPrimary,
-    marginHorizontal: 1.7,
-  },
-  brandMirror: { transform: [{ scaleX: -1 }] },
   list: {
     paddingHorizontal: spacing.lg,
   },

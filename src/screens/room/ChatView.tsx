@@ -28,7 +28,6 @@ type Props = {
   bottomInset: number;
   nowPlaying: string;
   inviteCode?: string;
-  onChangeContent?: () => void;
   /** Distance from the top of the screen to the chat — keeps the composer above
    *  the keyboard on both platforms. */
   keyboardOffset?: number;
@@ -90,7 +89,6 @@ export function ChatView({
   bottomInset,
   nowPlaying,
   inviteCode = '8F3K2Q',
-  onChangeContent,
   keyboardOffset = 0,
   roomId,
   myId,
@@ -276,14 +274,6 @@ export function ChatView({
           <Text style={styles.systemText}>
             Şimdi <Text style={styles.systemStrong}>{nowPlaying}</Text> oynatılıyor
           </Text>
-          {onChangeContent && (
-            <PressableScale onPress={onChangeContent} activeScale={0.9} accessibilityLabel="İçeriği değiştir">
-              <View style={styles.changeBtn}>
-                <Icon name="repeat" size={13} color={palette.amberBright} strokeWidth={2.2} />
-                <Text style={styles.changeText}>Değiştir</Text>
-              </View>
-            </PressableScale>
-          )}
         </View>
         <View style={styles.systemRow}>
           <Icon name="share" size={13} color={palette.textTertiary} />
@@ -436,16 +426,6 @@ const styles = StyleSheet.create({
   },
   systemText: { ...typography.footnote, color: palette.textSecondary, flex: 1 },
   systemStrong: { color: palette.textPrimary, fontWeight: '700' },
-  changeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.sm,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: palette.accentTintSoft,
-  },
-  changeText: { ...typography.caption1, color: palette.amberBright, fontWeight: '700' },
   inviteText: { ...typography.footnote, color: palette.textTertiary, flex: 1 },
   inviteLink: { color: palette.amber, fontWeight: '600', textDecorationLine: 'underline' },
   otherRow: {

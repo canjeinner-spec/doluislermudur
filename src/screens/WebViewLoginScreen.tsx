@@ -18,27 +18,44 @@ import type { RootStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WebViewLogin'>;
 
+/** URL patterns that mean the user opened actual content (→ open the room).
+ *  Kept to real playback paths (YouTube/Netflix `/watch`) — Prime browse/detail
+ *  URLs are intentionally excluded so it doesn't jump before playback; Prime
+ *  relies on the video-element probe instead. */
+const PLAYBACK_HINTS = ['/watch', '/play', '/viewer', '/stream'];
+
 /**
- * Injected into the login WebView: watches for a real, large <video> that is
- * actually playing, then reports it once. This is how we know the user has
- * logged in AND started the content — far more reliable than guessing from the
- * URL (which jumped to the room before Prime was even signed in).
+ * Injected into the login WebView: fires the moment a real, large <video> is
+ * chosen — as soon as it has content data (readyState >= 2), even if Android
+ * hasn't started rendering it yet. We deliberately do NOT wait for `!paused`,
+ * because Android blocks autoplay and the video would sit paused forever, so
+ * the probe never triggered and the room never opened.
  */
 const PLAYBACK_PROBE = `
 (function(){
   if(window.__asteraProbe){return;} window.__asteraProbe=true;
   var RNW=window.ReactNativeWebView;
-  function check(){
+  var fired=false;
+  function announce(){
+    if(fired)return;
     var list=document.querySelectorAll('video');
     for(var i=0;i<list.length;i++){var v=list[i];
-      var big=(v.clientWidth*v.clientHeight)>(window.innerWidth*window.innerHeight*0.30);
-      if(big&&!v.paused&&v.currentTime>0&&v.readyState>2){
+      var r=v.getBoundingClientRect();
+      var big=(r.width*r.height)>(window.innerWidth*window.innerHeight*0.30);
+      // Real, user-chosen content plays with sound; homepage hero/preview loops
+      // are muted, so requiring !muted keeps us from jumping while browsing.
+      var live=(v.src||v.currentSrc)&&!v.paused&&!v.muted&&v.currentTime>0.2;
+      if(big&&live){
+        fired=true;
         try{RNW.postMessage(JSON.stringify({t:'playing',url:location.href,title:document.title}));}catch(e){}
         return;
       }
     }
   }
-  setInterval(check,1000);
+  document.addEventListener('play',announce,true);
+  document.addEventListener('playing',announce,true);
+  document.addEventListener('loadeddata',announce,true);
+  setInterval(announce,700);
 })();
 true;
 `;
@@ -135,9 +152,16 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
     // Parse with a regex rather than `new URL` (Hermes' URL is incomplete).
     const match = /^(\w+):\/\/([^/?#]+)([^?#]*)(\?[^#]*)?/.exec(nav.url);
     if (!match) return;
-    const [, scheme, host] = match;
+    const [, scheme, host, pathname = '', search = ''] = match;
     setDomain(host.replace(/^www\./, ''));
     setSecure(scheme === 'https');
+    // Open the room the moment the URL lands on a real content/watch page. This
+    // is platform-independent — it does not depend on Android actually starting
+    // playback (the probe is a secondary, event-based trigger).
+    const path = (pathname + search).toLowerCase();
+    if (!nav.loading && PLAYBACK_HINTS.some((h) => path.includes(h))) {
+      finish(nav.url, nav.title);
+    }
   };
 
   // Keep everything inside the WebView: allow web + about/data, block deep

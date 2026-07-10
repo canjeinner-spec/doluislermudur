@@ -201,13 +201,6 @@ export function WebPlayer({ uri, userAgent, platform, fill, onToggleFullscreen, 
     setMuted(next);
     didUnmute.current = true;
     if (!ytId) applyWeb({ type: 'mute', value: next });
-    else if (Platform.OS === 'android' && !next) {
-      // The video started via muted autoplay (no gesture). Unmuting revokes that
-      // grant and Android pauses it (looks "frozen"). This tap IS a gesture, so
-      // re-assert play right after unmuting to resume — now with sound.
-      setPlaying(false);
-      setTimeout(() => setPlaying(true), 60);
-    }
     showControls();
   };
 

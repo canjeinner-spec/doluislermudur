@@ -176,6 +176,12 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
   const ytId = React.useMemo(() => extractYouTubeId(uri), [uri]);
   const vimeoUri = React.useMemo(() => toVimeo(uri), [uri]);
   const controller = React.useMemo(() => buildController(platform ?? ''), [platform]);
+  // Netflix rejects a cold, direct load of /watch/{id} in a fresh WebView with
+  // "bu içerik anında izleme için mevcut değil". Warm the app shell first: load
+  // netflix.com, then navigate to /watch — the way a real user reaches playback.
+  const isNetflix = platform === 'netflix';
+  const startUri = isNetflix ? 'https://www.netflix.com/' : vimeoUri;
+  const warmedRef = useRef(false);
 
   // For YouTube, `playing` starts false and is flipped to true in onReady — that
   // change is what injects playVideo *after* the player exists. It then tracks
@@ -425,11 +431,21 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
       ) : (
         <WebView
           ref={webRef}
-          source={{ uri: vimeoUri }}
+          source={{ uri: startUri }}
           style={styles.web}
           injectedJavaScriptBeforeContentLoaded={CHROME_SPOOF}
           injectedJavaScript={controller}
           onMessage={onWebMessage}
+          onLoadEnd={() => {
+            // Once netflix.com has loaded (app shell warm), hand off to the
+            // actual title so playback initialises like a normal navigation.
+            if (isNetflix && !warmedRef.current) {
+              warmedRef.current = true;
+              webRef.current?.injectJavaScript(
+                `setTimeout(function(){location.href=${JSON.stringify(vimeoUri)};},600);true;`
+              );
+            }
+          }}
           allowsInlineMediaPlayback
           mediaPlaybackRequiresUserAction={false}
           allowsFullscreenVideo={false}

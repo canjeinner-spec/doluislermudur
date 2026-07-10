@@ -201,6 +201,11 @@ export function WebPlayer({ uri, userAgent, platform, fill, onToggleFullscreen, 
     setMuted(next);
     didUnmute.current = true;
     if (!ytId) applyWeb({ type: 'mute', value: next });
+    else if (Platform.OS === 'android' && !next) {
+      // Unmuting can freeze the video surface on Android; a tiny re-seek forces
+      // the surface to refresh and keeps playback going.
+      setTimeout(() => ytRef.current?.seekTo(Math.max(0, position), true), 150);
+    }
     showControls();
   };
 
@@ -345,7 +350,9 @@ export function WebPlayer({ uri, userAgent, platform, fill, onToggleFullscreen, 
                 }
               }}
               webViewStyle={styles.ytWeb}
-              webViewProps={{ allowsInlineMediaPlayback: true, androidLayerType: 'hardware' }}
+              // No androidLayerType:'hardware' — the hardware video surface
+              // freezes on Android when the audio (mute) state changes.
+              webViewProps={{ allowsInlineMediaPlayback: true }}
             />
           )}
         </View>

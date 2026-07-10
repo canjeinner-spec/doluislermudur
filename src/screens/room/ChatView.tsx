@@ -42,11 +42,13 @@ function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 }
 
+// Note: authorName always carries the real display name (used for the avatar
+// monogram); "mine" rows just don't render the name text.
 function joinedToChat(m: MessageWithAuthor, myId?: string | null): ChatMessage {
   return {
     id: m.id,
     authorId: m.author_id,
-    authorName: m.author_id === myId ? 'Sen' : m.author?.display_name ?? 'İzleyici',
+    authorName: m.author?.display_name ?? 'İzleyici',
     tint: m.author?.avatar_tint ?? palette.copper,
     text: m.text,
     time: fmtTime(m.created_at),
@@ -59,7 +61,7 @@ function rowToChat(m: MessageRow, myId?: string | null, participants?: Participa
   return {
     id: m.id,
     authorId: m.author_id,
-    authorName: m.author_id === myId ? 'Sen' : p?.name ?? 'İzleyici',
+    authorName: p?.name ?? 'İzleyici',
     tint: p?.tint ?? palette.copper,
     text: m.text,
     time: fmtTime(m.created_at),
@@ -232,22 +234,31 @@ export function ChatView({
   );
 }
 
+const AVATAR = 36;
+
 function MessageRow({ message, grouped }: { message: ChatMessage; grouped: boolean }) {
   if (message.mine) {
     return (
-      <Animated.View entering={FadeIn.duration(160)} style={styles.mineRow}>
+      <Animated.View entering={FadeIn.duration(160)} style={[styles.mineRow, grouped && styles.grouped]}>
         <Text style={[typography.body, styles.mineText]}>{message.text}</Text>
+        {!grouped ? (
+          <Avatar name={message.authorName} tint={message.tint} size={AVATAR} ringColor={palette.white} ringWidth={2} />
+        ) : (
+          <View style={{ width: AVATAR }} />
+        )}
       </Animated.View>
     );
   }
 
   return (
     <Animated.View entering={FadeIn.duration(160)} style={[styles.otherRow, grouped && styles.grouped]}>
-      <View style={styles.avatarCol}>
-        {!grouped ? <Avatar name={message.authorName} tint={message.tint} size={30} /> : <View style={{ width: 30 }} />}
-      </View>
+      {!grouped ? (
+        <Avatar name={message.authorName} tint={message.tint} size={AVATAR} ringColor="rgba(255,255,255,0.55)" ringWidth={2} />
+      ) : (
+        <View style={{ width: AVATAR }} />
+      )}
       <Text style={[typography.body, styles.otherText]}>
-        {!grouped && <Text style={[styles.otherName, { color: message.tint }]}>{message.authorName}  </Text>}
+        {!grouped && <Text style={styles.otherName}>{message.authorName}: </Text>}
         {message.text}
       </Text>
     </Animated.View>
@@ -290,16 +301,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     alignItems: 'flex-start',
+    paddingRight: 44,
   },
-  grouped: { marginTop: -spacing.sm + 2 },
-  avatarCol: { width: 30, paddingTop: 1 },
-  otherText: { flex: 1, color: palette.textPrimary },
-  otherName: { fontWeight: '800' },
+  grouped: { marginTop: -spacing.sm + 1 },
+  otherText: { flex: 1, color: palette.textPrimary, fontSize: 16, lineHeight: 22, paddingTop: 6 },
+  otherName: { fontWeight: '800', color: palette.white },
   mineRow: {
-    alignItems: 'flex-end',
-    paddingLeft: 48,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    paddingLeft: 44,
   },
-  mineText: { color: palette.amberBright, textAlign: 'right', fontWeight: '500' },
+  mineText: {
+    color: palette.white,
+    textAlign: 'right',
+    fontWeight: '600',
+    fontSize: 16,
+    lineHeight: 22,
+    paddingTop: 6,
+    flexShrink: 1,
+  },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',

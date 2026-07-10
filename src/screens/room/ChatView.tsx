@@ -357,24 +357,29 @@ const SYS_LABEL: Record<'join' | 'leave' | 'kick', string> = {
   kick: 'atıldı',
 };
 
-/** Ephemeral presence line, rendered like an *incoming* message (avatar left) so
- *  it reads as the system announcing "{name} katıldı / ayrıldı / atıldı" — not as
- *  something you typed. Your own join reads "Odaya katıldın" as a confirmation. */
+/** Ephemeral presence line. Other members' join/leave/kick render like an
+ *  *incoming* message (avatar left) so it reads as the system announcing them,
+ *  not as something you typed. Your OWN join is the one thing that belongs to
+ *  you, so it sits on your side (right) as "Odaya katıldın". */
 function SystemNotice({ message, myId }: { message: ChatMessage; myId?: string | null }) {
   const kind = message.system ?? 'join';
   const isSelfJoin = kind === 'join' && !!myId && message.authorId === myId;
+
+  if (isSelfJoin) {
+    return (
+      <Animated.View entering={FadeIn.duration(160)} style={styles.systemNoticeRowSelf}>
+        <Text style={[styles.systemNoticeText, styles.systemNoticeName]}>Odaya katıldın</Text>
+        <Avatar name={message.authorName} tint={message.tint} size={SYS_AVATAR} imageUrl={message.avatarUrl} />
+      </Animated.View>
+    );
+  }
+
   return (
     <Animated.View entering={FadeIn.duration(160)} style={styles.systemNoticeRow}>
       <Avatar name={message.authorName} tint={message.tint} size={SYS_AVATAR} imageUrl={message.avatarUrl} />
       <Text style={styles.systemNoticeText} numberOfLines={1}>
-        {isSelfJoin ? (
-          <Text style={styles.systemNoticeName}>Odaya katıldın</Text>
-        ) : (
-          <>
-            <Text style={styles.systemNoticeName}>{message.authorName}</Text>{' '}
-            <Text style={kind === 'kick' ? styles.systemNoticeKick : undefined}>{SYS_LABEL[kind]}</Text>
-          </>
-        )}
+        <Text style={styles.systemNoticeName}>{message.authorName}</Text>{' '}
+        <Text style={kind === 'kick' ? styles.systemNoticeKick : undefined}>{SYS_LABEL[kind]}</Text>
       </Text>
     </Animated.View>
   );
@@ -455,6 +460,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     paddingRight: 44,
+  },
+  systemNoticeRowSelf: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    paddingLeft: 44,
   },
   systemNoticeText: { ...typography.footnote, color: palette.textSecondary, flexShrink: 1 },
   systemNoticeName: { color: palette.textPrimary, fontWeight: '800' },

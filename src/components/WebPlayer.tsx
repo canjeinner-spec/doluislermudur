@@ -26,6 +26,9 @@ type Props = {
   fullscreen?: boolean;
   /** Called with play/pause/seek intents so a sync layer can broadcast them. */
   onControl?: (event: ControlEvent) => void;
+  /** When false (non-host followers), playback controls are read-only — the
+   *  overlay shows time/progress but can't drive play/pause/seek. */
+  canControl?: boolean;
 };
 
 export type ControlEvent =
@@ -119,7 +122,7 @@ export type WebPlayerHandle = {
 };
 
 export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
-  { uri, userAgent, platform, fill, onToggleFullscreen, fullscreen, onControl },
+  { uri, userAgent, platform, fill, onToggleFullscreen, fullscreen, onControl, canControl = true },
   ref
 ) {
   const webRef = useRef<WebView>(null);
@@ -302,6 +305,7 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
   };
 
   const scrub = Gesture.Pan()
+    .enabled(canControl)
     .onBegin((e) => {
       knobScale.value = withTiming(1.35, { duration: 120 });
       runOnJS(setScrubbing)(true);
@@ -456,15 +460,24 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
           </View>
         </View>
 
-        <View style={styles.center} pointerEvents="box-none">
-          <ControlButton icon="backward" label="10 sn geri" onPress={() => seekBy(-10)} big />
-          <PressableScale onPress={togglePlay} activeScale={0.9} accessibilityLabel={playing ? 'Duraklat' : 'Oynat'}>
-            <View style={styles.playBtn}>
-              <Icon name={playing ? 'pause' : 'play'} size={28} color={palette.white} filled />
+        {canControl ? (
+          <View style={styles.center} pointerEvents="box-none">
+            <ControlButton icon="backward" label="10 sn geri" onPress={() => seekBy(-10)} big />
+            <PressableScale onPress={togglePlay} activeScale={0.9} accessibilityLabel={playing ? 'Duraklat' : 'Oynat'}>
+              <View style={styles.playBtn}>
+                <Icon name={playing ? 'pause' : 'play'} size={28} color={palette.white} filled />
+              </View>
+            </PressableScale>
+            <ControlButton icon="forward" label="10 sn ileri" onPress={() => seekBy(10)} big />
+          </View>
+        ) : (
+          <View style={styles.center} pointerEvents="none">
+            <View style={styles.hostBadge}>
+              <Icon name="crown" size={13} color={palette.amber} filled />
+              <Text style={styles.hostBadgeText}>Oynatmayı host yönetiyor</Text>
             </View>
-          </PressableScale>
-          <ControlButton icon="forward" label="10 sn ileri" onPress={() => seekBy(10)} big />
-        </View>
+          </View>
+        )}
 
         <View style={styles.bottom} pointerEvents="box-none">
           <View style={styles.timeRow}>
@@ -573,6 +586,16 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.14)',
   },
   ctrlBig: { width: 46, height: 46, borderRadius: 23 },
+  hostBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  hostBadgeText: { ...typography.caption1, color: palette.white, fontWeight: '600' },
   signinHint: {
     position: 'absolute',
     top: spacing.md,

@@ -86,7 +86,8 @@ export function RoomScreen({ navigation, route }: Props) {
   // Host-authoritative playback sync. You're the host of a room you created (or
   // any local/mock room); once the backend promotes a new host, isHost updates.
   const backend = isBackendConfigured && !!backendRoomId;
-  const isHost = !backend || session.hostId === myId;
+  // Default to follower until identities resolve, so we never have two "hosts".
+  const isHost = !backend || (!!myId && !!session.hostId && session.hostId === myId);
   const playerRef = useRef<WebPlayerHandle>(null);
   const sync = usePlaybackSync({ roomId: backendRoomId, isHost, enabled: backend, playerRef });
 
@@ -178,6 +179,7 @@ export function RoomScreen({ navigation, route }: Props) {
             fullscreen={fullscreen}
             onToggleFullscreen={toggleFullscreen}
             onControl={sync.broadcastControl}
+            canControl={isHost}
           />
         ) : session.loading ? (
           <View style={styles.playerLoading}>

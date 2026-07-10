@@ -40,6 +40,10 @@ function applyRemote(p: SyncEvent, player: WebPlayerHandle | null) {
  */
 export function usePlaybackSync({ roomId, isHost, enabled, playerRef }: Args) {
   const chanRef = useRef<RealtimeChannel | null>(null);
+  // Latest authoritative host state a follower knows about — re-applied every
+  // second so the moment the follower's player becomes ready it snaps into sync
+  // (a single heartbeat can arrive before the player can accept a seek).
+  const lastStateRef = useRef<{ time: number; paused: boolean; at: number } | null>(null);
 
   useEffect(() => {
     if (!enabled || !roomId || !supabase) return;
@@ -63,6 +67,9 @@ export function usePlaybackSync({ roomId, isHost, enabled, playerRef }: Args) {
         if (p.kind === 'request') pushState();
         return; // the host drives; it doesn't follow
       }
+      if (p.kind === 'heartbeat') lastStateRef.current = { time: p.time, paused: p.paused, at: p.at };
+      else if (p.kind === 'control' && p.action === 'seek') lastStateRef.current = { time: p.time, paused: false, at: p.at };
+      else if (p.kind === 'control') lastStateRef.current = { time: lastStateRef.current?.time ?? 0, paused: p.action === 'pause', at: p.at };
       applyRemote(p, playerRef.current);
     });
 
@@ -89,9 +96,19 @@ export function usePlaybackSync({ roomId, isHost, enabled, playerRef }: Args) {
     chanRef.current = ch;
 
     const heartbeat = isHost ? setInterval(pushState, 2500) : undefined;
+    // Follower: keep nudging the player toward the last known host state.
+    const reconcile = !isHost
+      ? setInterval(() => {
+          const s = lastStateRef.current;
+          if (s && playerRef.current) {
+            applyRemote({ kind: 'heartbeat', time: s.time, paused: s.paused, at: s.at }, playerRef.current);
+          }
+        }, 1000)
+      : undefined;
 
     return () => {
       if (heartbeat) clearInterval(heartbeat);
+      if (reconcile) clearInterval(reconcile);
       if (reqTimer) clearInterval(reqTimer);
       client.removeChannel(ch);
       chanRef.current = null;

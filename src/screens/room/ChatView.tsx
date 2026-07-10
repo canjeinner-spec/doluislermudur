@@ -15,12 +15,10 @@ import Svg, { Path } from 'react-native-svg';
 import { Avatar, Icon, PressableScale } from '@/components';
 import { CHAT_SEED, CURRENT_USER, type ChatMessage, type Participant } from '@/data';
 import {
-  fetchMessages,
   isBackendConfigured,
   sendMessage,
   subscribeMessages,
   type MessageRow,
-  type MessageWithAuthor,
 } from '@/backend';
 import { palette, radius, spacing, typography } from '@/theme';
 
@@ -46,18 +44,6 @@ function fmtTime(iso: string): string {
 
 // Note: authorName always carries the real display name (used for the avatar
 // monogram); "mine" rows just don't render the name text.
-function joinedToChat(m: MessageWithAuthor, myId?: string | null): ChatMessage {
-  return {
-    id: m.id,
-    authorId: m.author_id,
-    authorName: m.author?.display_name ?? 'İzleyici',
-    tint: m.author?.avatar_tint ?? palette.copper,
-    text: m.text,
-    time: fmtTime(m.created_at),
-    mine: m.author_id === myId,
-  };
-}
-
 function rowToChat(m: MessageRow, myId?: string | null, participants?: Participant[]): ChatMessage {
   const p = participants?.find((x) => x.id === m.author_id);
   return {
@@ -114,22 +100,18 @@ export function ChatView({
     participantsRef.current = participants;
   }, [participants]);
 
-  // Live messages from the backend: load history once we've joined (RLS needs
-  // membership, otherwise a late joiner fetches nothing → empty chat), then
-  // apply realtime inserts (deduped so our own echo doesn't appear twice).
+  // Chat is ephemeral: no history is loaded. You only see messages posted while
+  // you're in the room, so anyone who left (or left and rejoined) starts clean.
+  // We just subscribe to realtime inserts once we've joined (RLS needs
+  // membership), deduping our own echoed insert.
   useEffect(() => {
     if (!backend || !roomId || !ready) return;
-    let alive = true;
-    fetchMessages(roomId).then((rows) => {
-      if (alive) setMessages(rows.map((m) => joinedToChat(m, myId)));
-    });
     const unsub = subscribeMessages(roomId, (row) => {
       setMessages((prev) =>
         prev.some((x) => x.id === row.id) ? prev : [...prev, rowToChat(row, myId, participantsRef.current)]
       );
     });
     return () => {
-      alive = false;
       unsub();
     };
   }, [backend, roomId, myId, ready]);

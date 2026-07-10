@@ -18,6 +18,7 @@ export {
   updateRoomContent,
   kickMember,
   inviteByHandle,
+  addWatchMinutes,
   fetchRooms,
   fetchRoom,
   fetchMembers,

@@ -153,6 +153,12 @@ export async function joinRoom(roomId: string): Promise<boolean> {
   return true;
 }
 
+/** Add watch minutes to the current user's profile (called ~once a minute). */
+export async function addWatchMinutes(minutes: number): Promise<void> {
+  if (!supabase || minutes <= 0) return;
+  await supabase.rpc('add_watch_minutes', { p_minutes: minutes });
+}
+
 export async function leaveRoom(roomId: string): Promise<void> {
   if (!supabase) return;
   const me = await uid();

@@ -30,7 +30,7 @@ import {
   type Participant,
   type Room,
 } from '@/data';
-import { isBackendConfigured, kickMember, useAuth, useMyId, useRoomSession } from '@/backend';
+import { addWatchMinutes, isBackendConfigured, kickMember, useAuth, useMyId, useRoomSession } from '@/backend';
 import { palette, radius, spacing, typography } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 import { InviteFriendsSheet } from './sheets';
@@ -87,6 +87,14 @@ export function RoomScreen({ navigation, route }: Props) {
   // Host-authoritative playback sync. You're the host of a room you created (or
   // any local/mock room); once the backend promotes a new host, isHost updates.
   const backend = isBackendConfigured && !!backendRoomId;
+
+  // Count watch time: +1 minute for every minute spent in a backend room.
+  useEffect(() => {
+    if (!backend) return;
+    const iv = setInterval(() => addWatchMinutes(1), 60000);
+    return () => clearInterval(iv);
+  }, [backend]);
+
   // Default to follower until identities resolve, so we never have two "hosts".
   const isHost = !backend || (!!myId && !!session.hostId && session.hostId === myId);
   const playerRef = useRef<WebPlayerHandle>(null);

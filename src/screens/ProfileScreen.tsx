@@ -93,6 +93,8 @@ export function ProfileScreen({ navigation }: Props) {
           <Row icon="person-add" label="Kullanıcı adı" value={handle} />
           <View style={styles.divider} />
           <Row icon="sparkle" label="Üyelik" value={memberSince(profile?.created_at)} />
+          <View style={styles.divider} />
+          <Row icon="eye" label="Geçirilen süre" value={formatWatch(profile?.minutes_watched ?? 0)} />
         </GlassSurface>
       </ScrollView>
     </ScreenBackground>

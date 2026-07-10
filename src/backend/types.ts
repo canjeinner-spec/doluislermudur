@@ -112,6 +112,10 @@ export interface Database {
         Args: Record<string, never>;
         Returns: undefined;
       };
+      add_watch_minutes: {
+        Args: { p_minutes: number };
+        Returns: undefined;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

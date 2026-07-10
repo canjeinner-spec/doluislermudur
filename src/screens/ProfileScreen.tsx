@@ -14,16 +14,24 @@ import {
 } from '@/components';
 import type { IconName, PlatformId } from '@/components';
 import { CURRENT_USER, ROOMS } from '@/data';
+import { useMyProfile } from '@/backend';
 import { palette, radius, spacing, typography } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
-const STATS: { label: string; value: string; icon: IconName }[] = [
-  { label: 'İzleme', value: '48s', icon: 'eye' },
-  { label: 'Oda', value: '24', icon: 'rooms' },
-  { label: 'Arkadaş', value: '18', icon: 'users' },
-];
+const TR_MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+
+function formatWatch(minutes: number): string {
+  if (minutes >= 60) return `${Math.floor(minutes / 60)}s`;
+  return `${minutes}dk`;
+}
+
+function memberSince(iso?: string): string {
+  if (!iso) return 'Ocak 2026';
+  const d = new Date(iso);
+  return `${TR_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
 
 const PLATFORM_USAGE: { id: PlatformId; label: string; pct: number }[] = [
   { id: 'netflix', label: 'Netflix', pct: 0.62 },
@@ -41,6 +49,17 @@ const BADGES: { icon: IconName; label: string }[] = [
 
 export function ProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { profile } = useMyProfile();
+
+  const name = profile?.display_name ?? CURRENT_USER.name;
+  const handle = profile?.handle ?? CURRENT_USER.handle;
+  const tint = profile?.avatar_tint ?? CURRENT_USER.tint;
+
+  const stats: { label: string; value: string; icon: IconName }[] = [
+    { label: 'İzleme', value: formatWatch(profile?.minutes_watched ?? 0), icon: 'eye' },
+    { label: 'Kurulan Oda', value: String(profile?.rooms_hosted ?? 0), icon: 'rooms' },
+    { label: 'Arkadaş', value: '0', icon: 'users' },
+  ];
 
   return (
     <ScreenBackground glow="top">
@@ -58,18 +77,18 @@ export function ProfileScreen({ navigation }: Props) {
       >
         {/* Hero */}
         <GlassSurface borderRadius={radius.xxl} intensity={28} style={styles.hero}>
-          <Avatar name={CURRENT_USER.name} tint={CURRENT_USER.tint} size={78} online />
-          <Text style={[typography.title2, styles.name]}>{CURRENT_USER.name}</Text>
-          <Text style={[typography.subhead, styles.handle]}>{CURRENT_USER.handle}</Text>
+          <Avatar name={name} tint={tint} size={78} online />
+          <Text style={[typography.title2, styles.name]}>{name}</Text>
+          <Text style={[typography.subhead, styles.handle]}>{handle}</Text>
           <View style={styles.memberChip}>
             <Icon name="sparkle" size={12} color={palette.amber} filled />
-            <Text style={[typography.caption1, styles.memberText]}>Üye · Ocak 2026</Text>
+            <Text style={[typography.caption1, styles.memberText]}>Üye · {memberSince(profile?.created_at)}</Text>
           </View>
         </GlassSurface>
 
         {/* Stat tiles */}
         <View style={styles.statRow}>
-          {STATS.map((s) => (
+          {stats.map((s) => (
             <GlassSurface key={s.label} borderRadius={radius.lg} intensity={24} style={styles.statCard}>
               <Icon name={s.icon} size={18} color={palette.amber} />
               <Text style={[typography.title2, styles.statValue]}>{s.value}</Text>

@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import type { Participant, Room } from '@/data';
 
 import { isBackendConfigured } from './config';
+import { fetchMyProfile } from './auth';
+import type { ProfileRow } from './types';
 import {
   fetchMembers,
   fetchRoom,
@@ -43,6 +45,31 @@ export function useRooms(): { rooms: Room[]; loading: boolean } {
   }, []);
 
   return { rooms, loading };
+}
+
+/** The signed-in user's own profile row, live-ish (refetched on mount). */
+export function useMyProfile(): { profile: ProfileRow | null; loading: boolean } {
+  const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [loading, setLoading] = useState(isBackendConfigured);
+
+  useEffect(() => {
+    if (!isBackendConfigured) {
+      setLoading(false);
+      return;
+    }
+    let alive = true;
+    fetchMyProfile().then((p) => {
+      if (alive) {
+        setProfile(p);
+        setLoading(false);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  return { profile, loading };
 }
 
 export type RoomSession = {

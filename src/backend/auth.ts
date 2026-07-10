@@ -72,6 +72,15 @@ export async function ensureSession(): Promise<AuthedUser | null> {
   return profileToUser(created);
 }
 
+/** Fetch the signed-in user's profile row (null when backend is off). */
+export async function fetchMyProfile(): Promise<ProfileRow | null> {
+  if (!supabase) return null;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+  return data ?? null;
+}
+
 /** Update the local user's display name both locally and on the backend. */
 export async function updateDisplayName(name: string): Promise<void> {
   storage.setString(StorageKeys.displayName, name);

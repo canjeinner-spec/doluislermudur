@@ -16,10 +16,8 @@ import {
   PressableScale,
   RoomCard,
   ScreenBackground,
-  Sidebar,
   TextField,
 } from '@/components';
-import type { SidebarDestination } from '@/components';
 import { ROOMS } from '@/data';
 import { isBackendConfigured, useRooms } from '@/backend';
 import { accentGradient, palette, shadow, spacing, typography } from '@/theme';
@@ -49,7 +47,6 @@ const AnimatedCard = Animated.createAnimatedComponent(View);
 export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sheet, setSheet] = useState<SheetKey | null>(null);
 
   const { rooms: liveRooms } = useRooms();
@@ -68,45 +65,16 @@ export function HomeScreen({ navigation }: Props) {
 
   const activeCount = source.filter((r) => r.status === 'watching').length;
 
-  const handleSidebarSelect = (dest: SidebarDestination) => {
-    setSidebarOpen(false);
-    // Let the drawer close animation begin before pushing a screen/sheet.
-    setTimeout(() => {
-      switch (dest) {
-        case 'rooms':
-          break;
-        case 'create':
-          navigation.navigate('CreateRoom');
-          break;
-        case 'platforms':
-          setSheet('platforms');
-          break;
-        case 'howitworks':
-          setSheet('howitworks');
-          break;
-        case 'invite':
-          setSheet('invite');
-          break;
-        case 'settings':
-          setSheet('settings');
-          break;
-        case 'about':
-          setSheet('about');
-          break;
-      }
-    }, 180);
-  };
-
   return (
     <ScreenBackground>
       <NavBar
         left={
           <IconButton
-            icon="menu"
+            icon="info"
             iconSize={24}
             variant="plain"
-            accessibilityLabel="Menüyü aç"
-            onPress={() => setSidebarOpen(true)}
+            accessibilityLabel="Hakkında"
+            onPress={() => setSheet('about')}
           />
         }
         titleNode={<Text style={styles.brand}>ASTERA</Text>}
@@ -198,13 +166,6 @@ export function HomeScreen({ navigation }: Props) {
           </LinearGradient>
         </PressableScale>
       </View>
-
-      <Sidebar
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        onSelect={handleSidebarSelect}
-        active="rooms"
-      />
 
       <BottomSheet
         visible={sheet !== null}

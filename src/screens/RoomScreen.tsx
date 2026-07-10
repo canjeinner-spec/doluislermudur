@@ -209,16 +209,14 @@ export function RoomScreen({ navigation, route }: Props) {
           chrome; the now-playing / platform info lives under the player. */}
       {!fullscreen && (
         <View style={[styles.topBar, { paddingTop: insets.top + spacing.xs }]}>
-          <View style={styles.topSide}>
+          <View style={styles.sideLeft}>
             <IconButton icon="close" size={44} iconSize={26} variant="plain" accessibilityLabel="Odadan çık" onPress={() => navigation.goBack()} />
-          </View>
-          <View style={styles.titleWrap} pointerEvents="none">
-            <Wordmark size={22} />
-          </View>
-          <View style={[styles.topSide, styles.topRight]}>
             {isHost && (
               <IconButton icon="search" size={44} iconSize={24} variant="plain" accessibilityLabel="İçeriği değiştir" onPress={changeContent} />
             )}
+          </View>
+          <Wordmark size={22} />
+          <View style={styles.sideRight}>
             <IconButton icon="person-add" size={44} iconSize={24} variant="plain" accessibilityLabel="Davet et" onPress={() => setInviteOpen(true)} />
             <IconButton icon="users" size={44} iconSize={24} variant="plain" accessibilityLabel={`Katılımcılar · ${count}`} onPress={openUsers} />
           </View>
@@ -335,9 +333,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
     gap: spacing.sm,
   },
-  topSide: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  topRight: { justifyContent: 'flex-end' },
-  titleWrap: { flex: 1, alignItems: 'center' },
+  sideLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, justifyContent: 'flex-start' },
+  sideRight: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, justifyContent: 'flex-end' },
   chatWrap: { flex: 1 },
   playerWrap: { width: '100%' },
   playerLoading: {

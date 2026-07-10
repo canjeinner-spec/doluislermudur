@@ -312,7 +312,20 @@ export function openRoomPresence(
   const known = new Set<string>();
   let seeded = false;
 
-  const ch = client.channel(`presence:${roomId}`, { config: { presence: { key: me.id } } });
+  // Presence needs a stable, shared topic per room (all clients must meet on the
+  // same one), so we can't add a random suffix like the other channels. That
+  // means a leftover channel with this topic — from a fast re-entry (content
+  // change, in-room login) — is still registered and already subscribed; calling
+  // `.on()` on it then throws "cannot add presence callbacks after subscribe()".
+  // Tear any such channel down first so we always start clean.
+  const topic = `presence:${roomId}`;
+  for (const c of client.getChannels()) {
+    if (c.topic === topic || c.topic === `realtime:${topic}`) {
+      client.removeChannel(c);
+    }
+  }
+
+  const ch = client.channel(topic, { config: { presence: { key: me.id } } });
 
   ch.on('presence', { event: 'sync' }, () => {
     // First sync = the people already here → remember them without announcing.

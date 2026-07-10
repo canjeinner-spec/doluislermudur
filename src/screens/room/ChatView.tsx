@@ -131,11 +131,11 @@ export function ChatView({
     });
   }, [participants]);
 
-  // Presence notices: a member's join/leave/kick shows up in *everyone else's*
-  // feed (never your own — you don't announce yourself). Driven by a Realtime
-  // Presence channel so it's instant and reliable on both iOS and Android, and
-  // survives any number of leave/rejoin cycles. My own identity for the channel
-  // comes from my row in the live roster.
+  // Presence notices. You see your OWN "joined" line (a confirmation), plus every
+  // *other* member's join/leave/kick — instant and reliable on iOS + Android via
+  // a Realtime Presence channel, surviving any number of leave/rejoin cycles.
+  // Leaving/being kicked only shows to the people who stay (you're gone by then).
+  // My own identity for the channel comes from my row in the live roster.
   const meParticipant = participants?.find((p) => p.id === myId);
   const meName = meParticipant?.name;
   const meAvatar = meParticipant?.avatarUrl ?? null;
@@ -159,8 +159,14 @@ export function ChatView({
   }, []);
 
   const presenceRef = useRef<{ update: (m: PresenceUser) => void; close: () => void } | null>(null);
+  const selfJoinedRef = useRef(false);
   useEffect(() => {
     if (!backend || !roomId || !identityReady || !myId || !meName) return;
+    // Your own join confirmation ("Odaya katıldın") — once per room session.
+    if (!selfJoinedRef.current) {
+      selfJoinedRef.current = true;
+      pushNotice({ id: myId, name: meName, avatarUrl: meAvatar, tint: meTint ?? palette.copper }, 'join');
+    }
     const handle = openRoomPresence(
       roomId,
       { id: myId, name: meName, avatarUrl: meAvatar, tint: meTint ?? palette.copper },
@@ -272,7 +278,7 @@ export function ChatView({
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) =>
           item.message.system ? (
-            <SystemNotice message={item.message} />
+            <SystemNotice message={item.message} myId={myId} />
           ) : (
             <MessageRow message={item.message} grouped={item.grouped} />
           )
@@ -350,14 +356,22 @@ const SYS_LABEL: Record<'join' | 'leave' | 'kick', string> = {
   kick: 'atıldı',
 };
 
-/** Ephemeral presence line: "{name} katıldı / ayrıldı / atıldı" with the avatar. */
-function SystemNotice({ message }: { message: ChatMessage }) {
+/** Ephemeral presence line: "{name} katıldı / ayrıldı / atıldı" with the avatar.
+ *  Your own join reads "Odaya katıldın" as a confirmation. */
+function SystemNotice({ message, myId }: { message: ChatMessage; myId?: string | null }) {
   const kind = message.system ?? 'join';
+  const isSelfJoin = kind === 'join' && !!myId && message.authorId === myId;
   return (
     <Animated.View entering={FadeIn.duration(160)} style={styles.systemNoticeRow}>
       <Text style={styles.systemNoticeText} numberOfLines={1}>
-        <Text style={styles.systemNoticeName}>{message.authorName}</Text>{' '}
-        <Text style={kind === 'kick' ? styles.systemNoticeKick : undefined}>{SYS_LABEL[kind]}</Text>
+        {isSelfJoin ? (
+          <Text style={styles.systemNoticeName}>Odaya katıldın</Text>
+        ) : (
+          <>
+            <Text style={styles.systemNoticeName}>{message.authorName}</Text>{' '}
+            <Text style={kind === 'kick' ? styles.systemNoticeKick : undefined}>{SYS_LABEL[kind]}</Text>
+          </>
+        )}
       </Text>
       <Avatar name={message.authorName} tint={message.tint} size={SYS_AVATAR} imageUrl={message.avatarUrl} />
     </Animated.View>

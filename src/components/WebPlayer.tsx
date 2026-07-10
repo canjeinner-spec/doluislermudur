@@ -66,6 +66,24 @@ const CHROME_CSS: Record<string, string> = {
 };
 
 /**
+ * Runs BEFORE the provider's own scripts. Netflix/Prime verify they're talking
+ * to a real desktop Chrome (beyond the UA string) — a bare WebView has no
+ * `window.chrome`, reports `navigator.webdriver`, etc., which can trigger
+ * "bu içerik anında izleme için mevcut değil". This makes the environment look
+ * like ordinary Chrome. It does NOT touch DRM — if a title genuinely needs
+ * hardware (L1) Widevine, no amount of this helps.
+ */
+const CHROME_SPOOF = `
+(function(){try{
+  if(!window.chrome){window.chrome={runtime:{},app:{isInstalled:false},csi:function(){},loadTimes:function(){}};}
+  try{Object.defineProperty(navigator,'webdriver',{get:function(){return undefined;}});}catch(e){}
+  try{if(!navigator.languages||!navigator.languages.length){Object.defineProperty(navigator,'languages',{get:function(){return ['tr-TR','tr','en-US','en'];}});}}catch(e){}
+  try{if(!navigator.plugins||!navigator.plugins.length){Object.defineProperty(navigator,'plugins',{get:function(){return [1,2,3,4,5];}});}}catch(e){}
+}catch(e){}})();
+true;
+`;
+
+/**
  * Injected into every WebView provider page (Netflix, Prime, Drive, …). It:
  *   • finds the real content <video> (largest with a live source),
  *   • reports playback state so our overlay stays in sync,
@@ -409,6 +427,7 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
           ref={webRef}
           source={{ uri: vimeoUri }}
           style={styles.web}
+          injectedJavaScriptBeforeContentLoaded={CHROME_SPOOF}
           injectedJavaScript={controller}
           onMessage={onWebMessage}
           allowsInlineMediaPlayback

@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { palette } from '@/theme';
 import { storage, StorageKeys } from '@/storage/storage';
+import { WelcomeScreen } from '@/screens/WelcomeScreen';
 import { OnboardingScreen } from '@/screens/OnboardingScreen';
 import { LoginScreen } from '@/screens/LoginScreen';
 import { HomeScreen } from '@/screens/HomeScreen';
@@ -26,7 +27,7 @@ export function RootNavigator() {
 
   return (
     <Stack.Navigator
-      initialRouteName={seenOnboarding ? 'Home' : 'Onboarding'}
+      initialRouteName={seenOnboarding ? 'Home' : 'Welcome'}
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: palette.background },
@@ -35,6 +36,11 @@ export function RootNavigator() {
         fullScreenGestureEnabled: true,
       }}
     >
+      <Stack.Screen
+        name="Welcome"
+        component={WelcomeScreen}
+        options={{ animation: 'fade', gestureEnabled: false }}
+      />
       <Stack.Screen
         name="Onboarding"
         component={OnboardingScreen}

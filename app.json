@@ -27,14 +27,21 @@
       "adaptiveIcon": {
         "backgroundColor": "#090909",
         "foregroundImage": "./assets/adaptive-icon.png"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       [
         "expo-build-properties",
         {
-          "ios": { "deploymentTarget": "15.1" },
-          "android": { "minSdkVersion": 24 }
+          "ios": {
+            "deploymentTarget": "15.1"
+          },
+          "android": {
+            "minSdkVersion": 24
+          }
         }
       ],
       [
@@ -43,6 +50,12 @@
           "photosPermission": "Astera profil fotoğrafını değiştirmek için galerine erişmek istiyor."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "726c565a-1cc4-40ff-97e8-9b19ae6ce7a2"
+      }
+    },
+    "owner": "rjkovicx"
   }
 }

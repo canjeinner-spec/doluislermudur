@@ -70,7 +70,24 @@ function cleanTitle(raw: string, providerName?: string): string {
   );
   s = s.replace(/^(Watch|İzle)\s+/i, '');
   if (providerName) s = s.replace(new RegExp(`\\s*[-|•·—]?\\s*${providerName}\\s*$`, 'i'), '');
-  return s.trim().slice(0, 42);
+  return s.trim().slice(0, 80);
+}
+
+function isYouTubeUrl(u: string): boolean {
+  return /youtube\.com\/(watch|embed|shorts|v)|youtu\.be\//.test(u);
+}
+
+/** The reliable video title (and it's fetched fresh, unlike the page title which
+ *  is often still "YouTube" the moment we hand off). */
+async function youtubeTitle(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
+    if (!r.ok) return null;
+    const j = await r.json();
+    return typeof j.title === 'string' ? j.title.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 export function WebViewLoginScreen({ navigation, route }: Props) {
@@ -99,8 +116,14 @@ export function WebViewLoginScreen({ navigation, route }: Props) {
     if (!authed.includes(platformId)) {
       storage.setJSON(StorageKeys.authedPlatforms, [...authed, platformId]);
     }
-    const cleaned = cleanTitle(title ?? pageTitleRef.current, platform?.name) || platform?.name || 'Oda';
+    let cleaned = cleanTitle(title ?? pageTitleRef.current, platform?.name) || platform?.name || 'Oda';
     const contentUrl = url ?? pageUrlRef.current;
+    // For YouTube the page title is frequently still "YouTube" at hand-off, so
+    // pull the real video title from oEmbed.
+    if (isYouTubeUrl(contentUrl)) {
+      const yt = await youtubeTitle(contentUrl);
+      if (yt) cleaned = yt.slice(0, 80);
+    }
     const localParams = { draft, platformId, title: cleaned, contentUrl };
 
     // Changing content in an existing room: update it and pop back.

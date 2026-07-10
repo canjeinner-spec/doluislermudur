@@ -27,6 +27,8 @@ export interface Room {
   maxParticipants: number;
   /** Two-stop gradient standing in for a movie poster. */
   posterIndex: number;
+  /** Real content thumbnail (e.g. YouTube), when we can derive one. */
+  thumbnailUrl?: string;
   participants: Participant[];
 }
 

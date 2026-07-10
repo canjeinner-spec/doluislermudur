@@ -17,6 +17,15 @@ function posterFor(id: string): number {
   return h % 6;
 }
 
+/** A real content thumbnail from the URL when we can build one (YouTube). */
+export function thumbnailFor(contentUrl: string | null): string | undefined {
+  if (!contentUrl) return undefined;
+  const m = contentUrl.match(
+    /(?:youtube\.com\/(?:watch\?[^#]*\bv=|embed\/|shorts\/|v\/)|youtu\.be\/)([\w-]{11})/
+  );
+  return m ? `https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg` : undefined;
+}
+
 /** Map a DB room row into the app's Room shape used by the cards/room screen. */
 export function toRoom(r: RoomRow, participants: Participant[] = []): Room {
   const platform = getPlatform(r.platform);
@@ -32,6 +41,7 @@ export function toRoom(r: RoomRow, participants: Participant[] = []): Room {
     participantCount: r.member_count,
     maxParticipants: r.max_participants,
     posterIndex: posterFor(r.id),
+    thumbnailUrl: thumbnailFor(r.content_url),
     participants,
   };
 }

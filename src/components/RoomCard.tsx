@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { palette, posterGradients, shadow, spacing, typography } from '@/theme';
@@ -45,6 +45,9 @@ export function RoomCard({ room, onPress, onLongPress }: Props) {
           end={{ x: 0.9, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
+        {room.thumbnailUrl && (
+          <Image source={{ uri: room.thumbnailUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        )}
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.35)']}
           style={StyleSheet.absoluteFill}

@@ -54,6 +54,7 @@ function rowToChat(m: MessageRow, myId?: string | null, participants?: Participa
     authorId: m.author_id,
     authorName: p?.name ?? 'İzleyici',
     tint: p?.tint ?? palette.copper,
+    avatarUrl: p?.avatarUrl ?? null,
     text: m.text,
     time: fmtTime(m.created_at),
     mine: m.author_id === myId,
@@ -103,6 +104,26 @@ export function ChatView({
   const participantsRef = useRef(participants);
   useEffect(() => {
     participantsRef.current = participants;
+  }, [participants]);
+
+  // Keep already-rendered messages in sync with live profile edits: when a
+  // present member changes their name/photo, re-flow their past bubbles too.
+  // Authors who have left keep their last-known identity (not in the roster).
+  useEffect(() => {
+    if (!participants || participants.length === 0) return;
+    setMessages((prev) => {
+      let changed = false;
+      const next = prev.map((m) => {
+        const p = participants.find((x) => x.id === m.authorId);
+        if (!p) return m;
+        if (p.name === m.authorName && p.tint === m.tint && (p.avatarUrl ?? null) === (m.avatarUrl ?? null)) {
+          return m;
+        }
+        changed = true;
+        return { ...m, authorName: p.name, tint: p.tint, avatarUrl: p.avatarUrl ?? null };
+      });
+      return changed ? next : prev;
+    });
   }, [participants]);
 
   // Chat is ephemeral: no history is loaded. You only see messages posted while
@@ -255,7 +276,7 @@ function MessageRow({ message, grouped }: { message: ChatMessage; grouped: boole
       <Animated.View entering={FadeIn.duration(160)} style={[styles.mineRow, grouped && styles.grouped]}>
         <Text style={[typography.body, styles.mineText]}>{message.text}</Text>
         {!grouped ? (
-          <Avatar name={message.authorName} tint={message.tint} size={AVATAR} ringColor={palette.white} ringWidth={2} />
+          <Avatar name={message.authorName} tint={message.tint} size={AVATAR} imageUrl={message.avatarUrl} ringColor={palette.white} ringWidth={2} />
         ) : (
           <View style={{ width: AVATAR }} />
         )}
@@ -266,7 +287,7 @@ function MessageRow({ message, grouped }: { message: ChatMessage; grouped: boole
   return (
     <Animated.View entering={FadeIn.duration(160)} style={[styles.otherRow, grouped && styles.grouped]}>
       {!grouped ? (
-        <Avatar name={message.authorName} tint={message.tint} size={AVATAR} ringColor="rgba(255,255,255,0.55)" ringWidth={2} />
+        <Avatar name={message.authorName} tint={message.tint} size={AVATAR} imageUrl={message.avatarUrl} ringColor="rgba(255,255,255,0.55)" ringWidth={2} />
       ) : (
         <View style={{ width: AVATAR }} />
       )}

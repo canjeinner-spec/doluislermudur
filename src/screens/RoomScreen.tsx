@@ -98,6 +98,9 @@ export function RoomScreen({ navigation, route }: Props) {
   // Default to follower until identities resolve, so we never have two "hosts".
   const isHost = !backend || (!!myId && !!session.hostId && session.hostId === myId);
   const playerRef = useRef<WebPlayerHandle>(null);
+  // Set right before a *programmatic* leave (confirmed exit / kick) so the
+  // beforeRemove guard lets it through without re-asking.
+  const leavingConfirmedRef = useRef(false);
   const sync = usePlaybackSync({
     roomId: backendRoomId,
     isHost,
@@ -106,10 +109,33 @@ export function RoomScreen({ navigation, route }: Props) {
     onKicked: (userId) => {
       if (userId === myId) {
         Alert.alert('Odadan çıkarıldın', 'Host seni bu odadan çıkardı.');
+        leavingConfirmedRef.current = true;
         navigation.goBack();
       }
     },
   });
+
+  // Leaving a room is deliberate: intercept every exit (X button, Android back,
+  // any pop) and confirm first. The swipe-back gesture is disabled in the
+  // navigator, so this is the only way out.
+  useEffect(() => {
+    const sub = navigation.addListener('beforeRemove', (e) => {
+      if (leavingConfirmedRef.current) return;
+      e.preventDefault();
+      Alert.alert('Odadan çık', 'Odadan çıkmak istediğine emin misin?', [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Çık',
+          style: 'destructive',
+          onPress: () => {
+            leavingConfirmedRef.current = true;
+            navigation.dispatch(e.data.action);
+          },
+        },
+      ]);
+    });
+    return sub;
+  }, [navigation]);
 
   const kickParticipant = useCallback(
     (p: Participant) => {

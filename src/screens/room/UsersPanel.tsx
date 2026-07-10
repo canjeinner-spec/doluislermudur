@@ -78,7 +78,7 @@ function UserRow({
   const isMember = participant.role === 'member';
   return (
     <View style={styles.row}>
-      <Avatar name={participant.name} tint={participant.tint} size={40} online={participant.online} />
+      <Avatar name={participant.name} tint={participant.tint} size={40} online={participant.online} imageUrl={participant.avatarUrl} />
       <View style={styles.text}>
         <View style={styles.nameRow}>
           <Text style={[typography.subheadEmphasized, styles.name]} numberOfLines={1}>

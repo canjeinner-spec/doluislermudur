@@ -50,7 +50,8 @@ export function RootNavigator() {
       <Stack.Screen
         name="Room"
         component={RoomScreen}
-        options={{ animation: 'slide_from_right' }}
+        // No accidental swipe-out of a room — leaving is confirmed via the X.
+        options={{ animation: 'slide_from_right', gestureEnabled: false, fullScreenGestureEnabled: false }}
       />
     </Stack.Navigator>
   );

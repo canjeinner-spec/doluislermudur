@@ -52,7 +52,7 @@ export function toRoom(r: RoomRow, participants: Participant[] = []): Room {
 }
 
 export function memberToParticipant(
-  m: RoomMemberRow & { profile: Pick<ProfileRow, 'display_name' | 'handle' | 'avatar_tint'> | null },
+  m: RoomMemberRow & { profile: Pick<ProfileRow, 'display_name' | 'handle' | 'avatar_tint' | 'avatar_url'> | null },
   hostId: string
 ): Participant {
   return {
@@ -63,6 +63,7 @@ export function memberToParticipant(
     online: true,
     watching: true,
     tint: m.profile?.avatar_tint ?? '#C87F4C',
+    avatarUrl: m.profile?.avatar_url ?? null,
   };
 }
 
@@ -89,14 +90,14 @@ export async function fetchRoom(roomId: string): Promise<RoomRow | null> {
 }
 
 export type MemberWithProfile = RoomMemberRow & {
-  profile: Pick<ProfileRow, 'display_name' | 'handle' | 'avatar_tint'> | null;
+  profile: Pick<ProfileRow, 'display_name' | 'handle' | 'avatar_tint' | 'avatar_url'> | null;
 };
 
 export async function fetchMembers(roomId: string): Promise<MemberWithProfile[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from('room_members')
-    .select('*, profile:profiles(display_name, handle, avatar_tint)')
+    .select('*, profile:profiles(display_name, handle, avatar_tint, avatar_url)')
     .eq('room_id', roomId)
     .order('joined_at', { ascending: true });
   if (error) {
@@ -188,14 +189,14 @@ export async function updateRoomContent(
 }
 
 export type MessageWithAuthor = MessageRow & {
-  author: Pick<ProfileRow, 'display_name' | 'avatar_tint'> | null;
+  author: Pick<ProfileRow, 'display_name' | 'avatar_tint' | 'avatar_url'> | null;
 };
 
 export async function fetchMessages(roomId: string): Promise<MessageWithAuthor[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from('messages')
-    .select('*, author:profiles(display_name, avatar_tint)')
+    .select('*, author:profiles(display_name, avatar_tint, avatar_url)')
     .eq('room_id', roomId)
     .order('created_at', { ascending: true })
     .limit(200);
@@ -284,6 +285,23 @@ export function subscribeMembers(roomId: string, onChange: () => void): () => vo
       { event: '*', schema: 'public', table: 'room_members', filter: `room_id=eq.${roomId}` },
       onChange
     )
+    .subscribe();
+  return () => {
+    client.removeChannel(ch);
+  };
+}
+
+/**
+ * Fire when *any* profile row changes. Used inside a room so a member editing
+ * their name/photo re-flows into everyone's roster and chat in real time.
+ * (profiles has no room scope, so we can't filter — the handler just reloads.)
+ */
+export function subscribeProfiles(onChange: () => void): () => void {
+  if (!supabase) return () => {};
+  const client = supabase;
+  const ch = client
+    .channel(`profiles-${rand()}`)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, onChange)
     .subscribe();
   return () => {
     client.removeChannel(ch);

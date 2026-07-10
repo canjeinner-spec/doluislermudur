@@ -73,6 +73,8 @@ Backend `isBackendConfigured` arkasında; yapılandırılmadıysa mock veriye d�
 - `006_watch_time.sql` — `add_watch_minutes` RPC.
 - `007_avatar_upload.sql` — `profiles.avatar_url` kolonu + public `avatars` Storage bucket'ı
   + storage RLS (herkes okur, kullanıcı yalnızca kendi klasörüne yazar).
+- `008_realtime_profiles.sql` — `profiles` tablosunu `supabase_realtime` publication'ına ekler
+  (profil düzenlemeleri odadaki roster/sohbete anlık aksın).
 
 > ⚠️ **Yapılacak:** 002–006 migration'larının Supabase SQL editöründe çalıştırıldığından
 > emin ol. E-posta onayı (confirm mail) **kapalı** olmalı (doğrulandı).
@@ -95,6 +97,11 @@ Backend `isBackendConfigured` arkasında; yapılandırılmadıysa mock veriye d�
   bucket'ına yükle → `avatar_url` profile yaz; avatar her yerde resmi gösterir.
 - **Çıkış Yap + Hesabı Sil**, düzenleme ekranından alınıp Profil'de "HIZLI İŞLEMLER"e taşındı;
   düzenleme ekranı artık foto + ad + @handle + Kaydet/İptal odaklı.
+- **Avatar her yerde:** sohbet baloncukları ve kullanıcı listesi gerçek profil fotoğrafını gösterir.
+- **Canlı profil senkronu:** bir üye adını/fotoğrafını değiştirince odadaki roster ve sohbet
+  (o üyenin geçmiş mesajları dahil) anında güncellenir (`subscribeProfiles`).
+- **Kazara oda çıkışı engellendi:** kaydırma jesti kapalı; çıkış yalnızca sol üst X ile ve
+  "emin misin?" onayıyla (Android donanım geri tuşu da onaydan geçer; kick istisna).
 - İzleme süresi sayacı (dakikada +1) ve "geçirilen süre" / "kurulan oda" istatistikleri.
 - **Odada giriş yap → aynı odaya yeni hesapla dön** (eski anonim izleyici sayımda kalmaz).
 - Platform logoları: koyu karo kaldırıldı, şeffaf SVG sembol logolar (Netflix/YouTube/Prime/
@@ -115,8 +122,9 @@ Backend `isBackendConfigured` arkasında; yapılandırılmadıysa mock veriye d�
 
 ## 7. Kalan işler / sıradaki adımlar 📋
 
-1. **`007_avatar_upload.sql`'i Supabase SQL editöründe çalıştır** (bucket + kolon + policy) —
-   avatar yükleme bunsuz "bucket not found" verir. 002–006 zaten doğrulandı ✅.
+1. **`007_avatar_upload.sql` + `008_realtime_profiles.sql`'i Supabase SQL editöründe çalıştır**
+   — 007 olmadan avatar yükleme "bucket not found" verir; 008 olmadan profil değişiklikleri
+   odaya anlık yansımaz. 002–006 zaten doğrulandı ✅.
 2. Native dev build al → Android ses + Netflix/Prime DRM'i gerçek cihazda test et.
 3. Oda içi "kimler izliyor" ve host devri uç durumlarının cihazda testi.
 4. Yayın öncesi: hata/analitik, boş durum ekranları, ince tasarım geçişleri.

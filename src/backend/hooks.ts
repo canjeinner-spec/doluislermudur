@@ -15,6 +15,7 @@ import {
   currentUserId,
   memberToParticipant,
   subscribeMembers,
+  subscribeProfiles,
   subscribeRoom,
   subscribeRooms,
   toRoom,
@@ -166,11 +167,15 @@ export function useRoomSession(roomId: string | undefined): RoomSession {
     })();
     const unsubRoom = subscribeRoom(roomId, load);
     const unsubMembers = subscribeMembers(roomId, load);
+    // A member editing their name/photo updates profiles (not room_members), so
+    // reload the roster on profile changes too — keeps names/avatars live.
+    const unsubProfiles = subscribeProfiles(load);
 
     return () => {
       alive = false;
       unsubRoom();
       unsubMembers();
+      unsubProfiles();
       leaveRoom(roomId, joinedUid ?? undefined);
     };
   }, [roomId]);

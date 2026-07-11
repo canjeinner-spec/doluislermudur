@@ -66,6 +66,31 @@ const CHROME_CSS: Record<string, string> = {
 };
 
 /**
+ * Full desktop-Chrome impersonation, injected BEFORE the provider's scripts.
+ * A spoofed UA string alone is not enough: modern Netflix reads **Client Hints**
+ * (`navigator.userAgentData`), which in an Android WebView reports `mobile:true`
+ * / `platform:"Android"` regardless of the UA — so Netflix treats it as mobile
+ * and refuses web playback. We also fix `navigator.platform` and
+ * `maxTouchPoints` (a real desktop has no touch). This is presentation only — it
+ * does not touch DRM.
+ */
+const DESKTOP_SPOOF = `
+(function(){try{
+  var uaData={
+    brands:[{brand:'Chromium',version:'124'},{brand:'Google Chrome',version:'124'},{brand:'Not-A.Brand',version:'99'}],
+    mobile:false, platform:'Windows',
+    getHighEntropyValues:function(){return Promise.resolve({architecture:'x86',bitness:'64',model:'',platform:'Windows',platformVersion:'15.0.0',uaFullVersion:'124.0.0.0',fullVersionList:[{brand:'Google Chrome',version:'124.0.0.0'},{brand:'Chromium',version:'124.0.0.0'}],mobile:false});},
+    toJSON:function(){return {brands:this.brands,mobile:false,platform:'Windows'};}
+  };
+  try{Object.defineProperty(navigator,'userAgentData',{configurable:true,get:function(){return uaData;}});}catch(e){}
+  try{Object.defineProperty(navigator,'platform',{configurable:true,get:function(){return 'Win32';}});}catch(e){}
+  try{Object.defineProperty(navigator,'maxTouchPoints',{configurable:true,get:function(){return 0;}});}catch(e){}
+  try{if(!window.chrome){window.chrome={runtime:{}};}}catch(e){}
+}catch(e){}})();
+true;
+`;
+
+/**
  * Injected into every WebView provider page (Netflix, Prime, Drive, …). It:
  *   • finds the real content <video> (largest with a live source),
  *   • reports playback state so our overlay stays in sync,
@@ -158,6 +183,8 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
   const ytId = React.useMemo(() => extractYouTubeId(uri), [uri]);
   const vimeoUri = React.useMemo(() => toVimeo(uri), [uri]);
   const controller = React.useMemo(() => buildController(platform ?? ''), [platform]);
+  // DRM providers verify the browser via Client Hints; present desktop Chrome.
+  const beforeLoad = platform === 'netflix' || platform === 'prime' ? DESKTOP_SPOOF : undefined;
 
   // For YouTube, `playing` starts false and is flipped to true in onReady — that
   // change is what injects playVideo *after* the player exists. It then tracks
@@ -409,6 +436,7 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
           ref={webRef}
           source={{ uri: vimeoUri }}
           style={styles.web}
+          injectedJavaScriptBeforeContentLoaded={beforeLoad}
           injectedJavaScript={controller}
           onMessage={onWebMessage}
           allowsInlineMediaPlayback

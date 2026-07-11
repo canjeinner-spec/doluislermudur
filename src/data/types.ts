@@ -12,6 +12,8 @@ export interface Participant {
   watching: boolean;
   /** Avatar accent used for the monogram fallback. */
   tint: string;
+  /** Uploaded profile photo, when the user has one. */
+  avatarUrl?: string | null;
 }
 
 export interface Room {
@@ -37,10 +39,13 @@ export interface ChatMessage {
   authorId: string;
   authorName: string;
   tint: string;
+  avatarUrl?: string | null;
   text: string;
   time: string;
   /** True when the local user sent it (right-aligned bubble). */
   mine?: boolean;
+  /** Presence notice instead of a chat bubble: someone joined/left/was kicked. */
+  system?: 'join' | 'leave' | 'kick';
 }
 
 export interface Platform {

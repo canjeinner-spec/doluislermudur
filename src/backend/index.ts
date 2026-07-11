@@ -1,8 +1,10 @@
 export { supabase } from './supabase';
 export { isBackendConfigured } from './config';
+export { checkEmailPolicy, ALLOWED_EMAIL_DOMAINS } from './emailPolicy';
 export {
   ensureSession,
   updateDisplayName,
+  uploadAvatar,
   fetchMyProfile,
   emailExists,
   signIn,
@@ -26,9 +28,10 @@ export {
   fetchMessages,
   sendMessage,
   subscribeMessages,
+  openRoomPresence,
   toRoom,
 } from './rooms';
-export type { MessageWithAuthor } from './rooms';
+export type { MessageWithAuthor, PresenceUser } from './rooms';
 export { useRooms, useRoomSession, useMyProfile, useMyId, useAuth } from './hooks';
 export type { RoomSession } from './hooks';
 export type {

@@ -8,18 +8,17 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import {
   AuthGateModal,
   BottomSheet,
-  Icon,
   IconButton,
-  PlatformLogo,
-  PressableScale,
   ScreenBackground,
   VideoPlayer,
   WebPlayer,
+  Wordmark,
   type WebPlayerHandle,
 } from '@/components';
 import {
@@ -98,22 +97,55 @@ export function RoomScreen({ navigation, route }: Props) {
   // Default to follower until identities resolve, so we never have two "hosts".
   const isHost = !backend || (!!myId && !!session.hostId && session.hostId === myId);
   const playerRef = useRef<WebPlayerHandle>(null);
+  // Set right before a *programmatic* leave (confirmed exit / kick) so the
+  // beforeRemove guard lets it through without re-asking.
+  const leavingConfirmedRef = useRef(false);
+  // User ids that left because they were kicked (not a voluntary leave), so chat
+  // can label the presence notice "atıldı" vs "ayrıldı". Consumed by ChatView.
+  const kickedIdsRef = useRef<Set<string>>(new Set());
   const sync = usePlaybackSync({
     roomId: backendRoomId,
     isHost,
     enabled: backend,
     playerRef,
     onKicked: (userId) => {
+      kickedIdsRef.current.add(userId);
       if (userId === myId) {
         Alert.alert('Odadan çıkarıldın', 'Host seni bu odadan çıkardı.');
+        leavingConfirmedRef.current = true;
         navigation.goBack();
       }
     },
   });
 
+  // Leaving a room is deliberate: intercept every exit (X button, Android back,
+  // any pop) and confirm first. The swipe-back gesture is disabled in the
+  // navigator, so this is the only way out.
+  useEffect(() => {
+    const sub = navigation.addListener('beforeRemove', (e) => {
+      if (leavingConfirmedRef.current) return;
+      e.preventDefault();
+      Alert.alert('Odadan çık', 'Odadan çıkmak istediğine emin misin?', [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Çık',
+          style: 'destructive',
+          onPress: () => {
+            leavingConfirmedRef.current = true;
+            navigation.dispatch(e.data.action);
+          },
+        },
+      ]);
+    });
+    return sub;
+  }, [navigation]);
+
   const kickParticipant = useCallback(
     (p: Participant) => {
       if (!backendRoomId) return;
+      // The host doesn't receive its own broadcast (self:false), so record the
+      // kick locally too — otherwise our own chat would say "ayrıldı".
+      kickedIdsRef.current.add(p.id);
       kickMember(backendRoomId, p.id);
       sync.broadcastKick(p.id);
     },
@@ -123,6 +155,10 @@ export function RoomScreen({ navigation, route }: Props) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [usersOpen, setUsersOpen] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  // Bumped after a login-only trip so the player remounts and its WebView reloads
+  // with the now-authenticated session (co-watching: the viewer's own copy).
+  const [reloadTick, setReloadTick] = useState(0);
+  const pendingReloadRef = useRef(false);
   const [chatTop, setChatTop] = useState(0);
   const [authGate, setAuthGate] = useState(false);
 
@@ -172,29 +208,42 @@ export function RoomScreen({ navigation, route }: Props) {
       roomId: backendRoomId,
     });
 
+  // Viewer isn't signed in to the provider → open that provider's login. On
+  // return we reload the player so their session plays their own copy.
+  const openProviderLogin = () => {
+    pendingReloadRef.current = true;
+    navigation.navigate('WebViewLogin', {
+      platformId: room.platform,
+      draft: { isPublic: room.isPublic },
+      loginOnly: true,
+    });
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      if (pendingReloadRef.current) {
+        pendingReloadRef.current = false;
+        setReloadTick((t) => t + 1);
+      }
+    }, [])
+  );
+
   return (
     <ScreenBackground glow="none">
-      {/* Top bar — X + fullscreen · title · invite + participants */}
+      {/* Top bar — X · ASTERA · (change) invite + participants. Bare icons, no
+          chrome; the now-playing / platform info lives under the player. */}
       {!fullscreen && (
         <View style={[styles.topBar, { paddingTop: insets.top + spacing.xs }]}>
-          <View style={styles.topSide}>
-            <IconButton icon="close" size={38} variant="glass" accessibilityLabel="Odadan çık" onPress={() => navigation.goBack()} />
-            <IconButton icon="fullscreen" size={38} variant="glass" accessibilityLabel="Tam ekran" onPress={toggleFullscreen} />
+          <View style={styles.sideLeft}>
+            <IconButton icon="close" size={44} iconSize={26} variant="plain" accessibilityLabel="Odadan çık" onPress={() => navigation.goBack()} />
+            {isHost && (
+              <IconButton icon="search" size={44} iconSize={24} variant="plain" accessibilityLabel="İçeriği değiştir" onPress={changeContent} />
+            )}
           </View>
-          <View style={styles.titleWrap} pointerEvents="none">
-            <Text style={[typography.subheadEmphasized, styles.title]} numberOfLines={1}>
-              {room.title}
-            </Text>
-            <View style={styles.subRow}>
-              <PlatformLogo id={room.platform} size={12} />
-              <Text style={[typography.caption2, styles.sub]} numberOfLines={1}>
-                {room.platformLabel}
-              </Text>
-            </View>
-          </View>
-          <View style={[styles.topSide, styles.topRight]}>
-            <IconButton icon="person-add" size={38} variant="glass" accessibilityLabel="Davet et" onPress={() => setInviteOpen(true)} />
-            <PressableCount count={count} onPress={openUsers} />
+          <Wordmark size={22} />
+          <View style={styles.sideRight}>
+            <IconButton icon="person-add" size={44} iconSize={24} variant="plain" accessibilityLabel="Davet et" onPress={() => setInviteOpen(true)} />
+            <IconButton icon="users" size={44} iconSize={24} variant="plain" accessibilityLabel={`Katılımcılar · ${count}`} onPress={openUsers} />
           </View>
         </View>
       )}
@@ -204,7 +253,7 @@ export function RoomScreen({ navigation, route }: Props) {
         {contentUrl ? (
           <WebPlayer
             ref={playerRef}
-            key={contentUrl}
+            key={`${contentUrl}:${reloadTick}`}
             uri={contentUrl}
             platform={room.platform}
             userAgent={userAgentFor(room.platform, Platform.OS)}
@@ -213,6 +262,7 @@ export function RoomScreen({ navigation, route }: Props) {
             onToggleFullscreen={toggleFullscreen}
             onControl={sync.broadcastControl}
             canControl={isHost}
+            onRequireProviderLogin={openProviderLogin}
           />
         ) : session.loading ? (
           <View style={styles.playerLoading}>
@@ -229,12 +279,12 @@ export function RoomScreen({ navigation, route }: Props) {
           <ChatView
             bottomInset={insets.bottom}
             nowPlaying={room.title}
-            onChangeContent={changeContent}
             keyboardOffset={chatTop}
             roomId={backendRoomId}
             myId={myId}
             participants={participants}
             ready={!session.loading}
+            kickedIdsRef={kickedIdsRef}
             canInteract={canInteract}
             onRequireAuth={() => setAuthGate(true)}
           />
@@ -300,17 +350,6 @@ export function RoomScreen({ navigation, route }: Props) {
   );
 }
 
-function PressableCount({ count, onPress }: { count: number; onPress: () => void }) {
-  return (
-    <PressableScale onPress={onPress} activeScale={0.9} accessibilityLabel={`${count} katılımcı`}>
-      <View style={styles.countBtn}>
-        <Icon name="users" size={18} color={palette.textPrimary} />
-        <Text style={[typography.footnoteEmphasized, styles.countText]}>{count}</Text>
-      </View>
-    </PressableScale>
-  );
-}
-
 const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
@@ -320,12 +359,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
     gap: spacing.sm,
   },
-  topSide: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  topRight: { justifyContent: 'flex-end' },
-  titleWrap: { flex: 1, alignItems: 'center', gap: 1 },
-  title: { color: palette.textPrimary, maxWidth: 180 },
-  subRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  sub: { color: palette.textSecondary },
+  sideLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, justifyContent: 'flex-start' },
+  sideRight: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, justifyContent: 'flex-end' },
   chatWrap: { flex: 1 },
   playerWrap: { width: '100%' },
   playerLoading: {
@@ -381,17 +416,5 @@ const styles = StyleSheet.create({
   },
   usersTitle: { color: palette.textPrimary },
   usersSub: { color: palette.textTertiary, marginTop: 1 },
-  countBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    height: 38,
-    paddingHorizontal: spacing.md,
-    borderRadius: 19,
-    backgroundColor: palette.glass,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: palette.glassBorder,
-  },
-  countText: { color: palette.textPrimary },
 });
 

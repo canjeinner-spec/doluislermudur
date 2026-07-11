@@ -52,7 +52,7 @@ export function toRoom(r: RoomRow, participants: Participant[] = []): Room {
 }
 
 export function memberToParticipant(
-  m: RoomMemberRow & { profile: Pick<ProfileRow, 'display_name' | 'handle' | 'avatar_tint'> | null },
+  m: RoomMemberRow & { profile: Pick<ProfileRow, 'display_name' | 'handle' | 'avatar_tint' | 'avatar_url'> | null },
   hostId: string
 ): Participant {
   return {
@@ -63,6 +63,7 @@ export function memberToParticipant(
     online: true,
     watching: true,
     tint: m.profile?.avatar_tint ?? '#C87F4C',
+    avatarUrl: m.profile?.avatar_url ?? null,
   };
 }
 
@@ -89,14 +90,14 @@ export async function fetchRoom(roomId: string): Promise<RoomRow | null> {
 }
 
 export type MemberWithProfile = RoomMemberRow & {
-  profile: Pick<ProfileRow, 'display_name' | 'handle' | 'avatar_tint'> | null;
+  profile: Pick<ProfileRow, 'display_name' | 'handle' | 'avatar_tint' | 'avatar_url'> | null;
 };
 
 export async function fetchMembers(roomId: string): Promise<MemberWithProfile[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from('room_members')
-    .select('*, profile:profiles(display_name, handle, avatar_tint)')
+    .select('*, profile:profiles(display_name, handle, avatar_tint, avatar_url)')
     .eq('room_id', roomId)
     .order('joined_at', { ascending: true });
   if (error) {
@@ -188,14 +189,14 @@ export async function updateRoomContent(
 }
 
 export type MessageWithAuthor = MessageRow & {
-  author: Pick<ProfileRow, 'display_name' | 'avatar_tint'> | null;
+  author: Pick<ProfileRow, 'display_name' | 'avatar_tint' | 'avatar_url'> | null;
 };
 
 export async function fetchMessages(roomId: string): Promise<MessageWithAuthor[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from('messages')
-    .select('*, author:profiles(display_name, avatar_tint)')
+    .select('*, author:profiles(display_name, avatar_tint, avatar_url)')
     .eq('room_id', roomId)
     .order('created_at', { ascending: true })
     .limit(200);
@@ -284,6 +285,100 @@ export function subscribeMembers(roomId: string, onChange: () => void): () => vo
       { event: '*', schema: 'public', table: 'room_members', filter: `room_id=eq.${roomId}` },
       onChange
     )
+    .subscribe();
+  return () => {
+    client.removeChannel(ch);
+  };
+}
+
+/**
+ * Live join/leave presence for a room, over a Realtime **Presence** channel
+ * (not postgres_changes). Each client tracks its own identity; every *other*
+ * client is told when it joins or leaves — instantly, on both platforms, and
+ * independent of DB replication/RLS timing. Members already present when you
+ * arrive are seeded silently (no "joined" spam), and updating your own identity
+ * (name/photo edit) via `update()` never reads as a leave/join to others.
+ */
+export type PresenceUser = { id: string; name: string; avatarUrl: string | null; tint: string };
+
+export function openRoomPresence(
+  roomId: string,
+  me: PresenceUser,
+  handlers: { onJoin: (u: PresenceUser) => void; onLeave: (u: PresenceUser) => void }
+): { update: (next: PresenceUser) => void; close: () => void } {
+  if (!supabase) return { update: () => {}, close: () => {} };
+  const client = supabase;
+  let current = me;
+  const known = new Set<string>();
+  let seeded = false;
+
+  // Presence needs a stable, shared topic per room (all clients must meet on the
+  // same one), so we can't add a random suffix like the other channels. That
+  // means a leftover channel with this topic — from a fast re-entry (content
+  // change, in-room login) — is still registered and already subscribed; calling
+  // `.on()` on it then throws "cannot add presence callbacks after subscribe()".
+  // Tear any such channel down first so we always start clean.
+  const topic = `presence:${roomId}`;
+  for (const c of client.getChannels()) {
+    if (c.topic === topic || c.topic === `realtime:${topic}`) {
+      client.removeChannel(c);
+    }
+  }
+
+  const ch = client.channel(topic, { config: { presence: { key: me.id } } });
+
+  ch.on('presence', { event: 'sync' }, () => {
+    // First sync = the people already here → remember them without announcing.
+    if (seeded) return;
+    Object.keys(ch.presenceState()).forEach((k) => known.add(k));
+    seeded = true;
+  });
+  ch.on('presence', { event: 'join' }, ({ key, newPresences }) => {
+    // Self, pre-seed members, and re-tracks of a known key are all silent.
+    if (key === current.id || !seeded || known.has(key)) {
+      known.add(key);
+      return;
+    }
+    known.add(key);
+    const p = newPresences[newPresences.length - 1] as unknown as PresenceUser | undefined;
+    if (p?.id) handlers.onJoin(p);
+  });
+  ch.on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+    if (key === current.id || !known.has(key)) {
+      known.delete(key);
+      return;
+    }
+    known.delete(key);
+    const p = leftPresences[leftPresences.length - 1] as unknown as PresenceUser | undefined;
+    if (p?.id) handlers.onLeave(p);
+  });
+
+  ch.subscribe((status) => {
+    if (status === 'SUBSCRIBED') ch.track(current).catch(() => {});
+  });
+
+  return {
+    update: (next) => {
+      current = next;
+      ch.track(next).catch(() => {});
+    },
+    close: () => {
+      client.removeChannel(ch);
+    },
+  };
+}
+
+/**
+ * Fire when *any* profile row changes. Used inside a room so a member editing
+ * their name/photo re-flows into everyone's roster and chat in real time.
+ * (profiles has no room scope, so we can't filter — the handler just reloads.)
+ */
+export function subscribeProfiles(onChange: () => void): () => void {
+  if (!supabase) return () => {};
+  const client = supabase;
+  const ch = client
+    .channel(`profiles-${rand()}`)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, onChange)
     .subscribe();
   return () => {
     client.removeChannel(ch);

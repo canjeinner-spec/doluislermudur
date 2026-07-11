@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { Icon, IconButton, NavBar, PressableScale, ScreenBackground, TextField } from '@/components';
-import { deleteAccount, setHandle, signOut, updateDisplayName, useAuth, useMyProfile } from '@/backend';
+import { Avatar, Icon, IconButton, NavBar, PressableScale, ScreenBackground, TextField } from '@/components';
+import { CURRENT_USER } from '@/data';
+import { setHandle, updateDisplayName, uploadAvatar, useAuth, useMyProfile } from '@/backend';
 import { accentGradient, palette, radius, spacing, typography } from '@/theme';
 import type { RootStackParamList } from '@/navigation/types';
 
@@ -22,6 +24,8 @@ export function ProfileEditScreen({ navigation }: Props) {
   const [name, setName] = useState('');
   // Handle is edited WITHOUT the leading "@" — it's shown as a fixed prefix.
   const [handleName, setHandleName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -29,13 +33,47 @@ export function ProfileEditScreen({ navigation }: Props) {
     if (profile) {
       setName(profile.display_name);
       setHandleName(profile.handle.replace(/^@/, ''));
+      setAvatarUrl(profile.avatar_url ?? null);
     }
   }, [profile]);
+
+  const tint = profile?.avatar_tint ?? CURRENT_USER.tint;
 
   const nextHandleChange = profile?.handle_updated_at
     ? new Date(new Date(profile.handle_updated_at).getTime() + WEEK)
     : null;
   const handleLocked = !!nextHandleChange && nextHandleChange.getTime() > Date.now();
+
+  const pickAvatar = async () => {
+    setMsg(null);
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('İzin gerekli', 'Fotoğraf seçebilmek için galeri erişimine izin vermen gerekiyor.');
+      return;
+    }
+    const res = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+      base64: true,
+    });
+    const asset = res.assets?.[0];
+    if (res.canceled || !asset?.base64) return;
+
+    const mime = asset.mimeType ?? '';
+    const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg';
+
+    setUploading(true);
+    const out = await uploadAvatar(asset.base64, ext);
+    setUploading(false);
+    if (!out.ok || !out.url) {
+      setMsg({ ok: false, text: out.error ?? 'Fotoğraf yüklenemedi' });
+      return;
+    }
+    setAvatarUrl(out.url);
+    await refresh();
+    setMsg({ ok: true, text: 'Fotoğraf güncellendi' });
+  };
 
   const save = async () => {
     setMsg(null);
@@ -60,38 +98,6 @@ export function ProfileEditScreen({ navigation }: Props) {
     setMsg({ ok: true, text: 'Değişiklikler kaydedildi' });
   };
 
-  const logout = () => {
-    Alert.alert('Çıkış yap', 'Hesabından çıkış yapmak istiyor musun?', [
-      { text: 'Vazgeç', style: 'cancel' },
-      {
-        text: 'Çıkış Yap',
-        style: 'destructive',
-        onPress: async () => {
-          await signOut();
-          navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-        },
-      },
-    ]);
-  };
-
-  const remove = () => {
-    Alert.alert('Hesabı sil', 'Hesabın ve tüm verilerin kalıcı olarak silinecek. Bu işlem geri alınamaz.', [
-      { text: 'Vazgeç', style: 'cancel' },
-      {
-        text: 'Hesabı Sil',
-        style: 'destructive',
-        onPress: async () => {
-          const err = await deleteAccount();
-          if (err) {
-            Alert.alert('Silinemedi', err);
-            return;
-          }
-          navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] });
-        },
-      },
-    ]);
-  };
-
   return (
     <ScreenBackground glow="top">
       <NavBar
@@ -100,10 +106,31 @@ export function ProfileEditScreen({ navigation }: Props) {
       />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex} keyboardVerticalOffset={80}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xl }]}>
-          <Text style={styles.label}>Görünen ad</Text>
-          <TextField value={name} onChangeText={setName} placeholder="Görünen ad" icon="users" maxLength={30} />
+          {/* Avatar + change-photo */}
+          <View style={styles.avatarBlock}>
+            <PressableScale onPress={pickAvatar} activeScale={0.96} disabled={uploading} accessibilityLabel="Fotoğrafı değiştir">
+              <View>
+                <Avatar name={name || profile?.display_name || 'A'} tint={tint} size={96} imageUrl={avatarUrl} />
+                <View style={styles.cameraBadge}>
+                  {uploading ? (
+                    <ActivityIndicator size="small" color={palette.white} />
+                  ) : (
+                    <Icon name="camera" size={15} color={palette.white} />
+                  )}
+                </View>
+              </View>
+            </PressableScale>
+            <PressableScale onPress={pickAvatar} activeScale={0.97} disabled={uploading} accessibilityLabel="Fotoğrafı değiştir" style={styles.photoBtnWrap}>
+              <View style={styles.photoBtn}>
+                <Text style={[typography.footnoteEmphasized, styles.photoBtnText]}>Fotoğrafı Değiştir</Text>
+              </View>
+            </PressableScale>
+          </View>
 
-          <Text style={styles.label}>Kullanıcı adı</Text>
+          <Text style={styles.label}>GÖRÜNEN AD</Text>
+          <TextField value={name} onChangeText={setName} placeholder="Görünen ad" icon="users" maxLength={20} showCounter />
+
+          <Text style={styles.label}>KULLANICI ADI</Text>
           {isAnonymous ? (
             <Text style={styles.info}>Kullanıcı adı belirlemek için giriş yapman gerekiyor.</Text>
           ) : (
@@ -117,6 +144,7 @@ export function ProfileEditScreen({ navigation }: Props) {
                 autoCapitalize="none"
                 editable={!handleLocked}
                 maxLength={20}
+                showCounter
               />
               <Text style={styles.info}>
                 {handleLocked && nextHandleChange
@@ -136,21 +164,11 @@ export function ProfileEditScreen({ navigation }: Props) {
             </LinearGradient>
           </PressableScale>
 
-          <View style={styles.dangerZone}>
-            <PressableScale onPress={logout} activeScale={0.97} accessibilityLabel="Çıkış yap">
-              <View style={styles.dangerRow}>
-                <Icon name="logout" size={18} color={palette.textSecondary} />
-                <Text style={[typography.bodyEmphasized, styles.logoutText]}>Çıkış Yap</Text>
-              </View>
-            </PressableScale>
-            <View style={styles.dangerDivider} />
-            <PressableScale onPress={remove} activeScale={0.97} accessibilityLabel="Hesabı sil">
-              <View style={styles.dangerRow}>
-                <Icon name="close" size={18} color={palette.danger} />
-                <Text style={[typography.bodyEmphasized, styles.deleteText]}>Hesabı Sil</Text>
-              </View>
-            </PressableScale>
-          </View>
+          <PressableScale onPress={() => navigation.goBack()} activeScale={0.97} disabled={busy} accessibilityLabel="İptal" style={styles.cancelWrap}>
+            <View style={styles.cancel}>
+              <Text style={[typography.headline, styles.cancelText]}>İptal</Text>
+            </View>
+          </PressableScale>
         </ScrollView>
       </KeyboardAvoidingView>
     </ScreenBackground>
@@ -160,9 +178,34 @@ export function ProfileEditScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.sm },
+  avatarBlock: { alignItems: 'center', gap: spacing.md, marginTop: spacing.sm, marginBottom: spacing.md },
+  cameraBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: palette.copper,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: palette.background,
+  },
+  photoBtnWrap: { alignSelf: 'center' },
+  photoBtn: {
+    paddingHorizontal: spacing.lg,
+    height: 40,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: palette.accentTintSoft,
+  },
+  photoBtnText: { color: palette.amber },
   label: {
     ...typography.footnoteEmphasized,
     color: palette.textTertiary,
+    letterSpacing: 0.6,
     marginTop: spacing.md,
     marginLeft: spacing.xs,
   },
@@ -171,16 +214,15 @@ const styles = StyleSheet.create({
   saveWrap: { marginTop: spacing.lg },
   save: { height: 54, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   saveText: { color: palette.white, fontWeight: '700' },
-  dangerZone: {
-    marginTop: spacing.xl,
+  cancelWrap: { marginTop: spacing.sm },
+  cancel: {
+    height: 54,
     borderRadius: radius.lg,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: palette.surfaceSecondary,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: palette.glassBorder,
-    overflow: 'hidden',
   },
-  dangerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
-  dangerDivider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.separator },
-  logoutText: { color: palette.textPrimary },
-  deleteText: { color: palette.danger },
+  cancelText: { color: palette.textSecondary, fontWeight: '700' },
 });

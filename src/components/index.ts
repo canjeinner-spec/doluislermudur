@@ -14,6 +14,7 @@ export { AuthGateModal } from './AuthGateModal';
 export { SectionHeader } from './SectionHeader';
 export { ListRow } from './ListRow';
 export { NavBar } from './NavBar';
+export { Wordmark } from './Wordmark';
 export { RoomCard } from './RoomCard';
 export { BottomSheet } from './BottomSheet';
 export { VideoPlayer } from './VideoPlayer';

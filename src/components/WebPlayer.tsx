@@ -1,5 +1,5 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -29,6 +29,10 @@ type Props = {
   /** When false (non-host followers), playback controls are read-only — the
    *  overlay shows time/progress but can't drive play/pause/seek. */
   canControl?: boolean;
+  /** Fired when the embed shows a provider sign-in gate — the room offers an
+   *  "Oturum aç" button that opens the provider's login (co-watching: each
+   *  viewer streams their own copy). */
+  onRequireProviderLogin?: () => void;
 };
 
 export type ControlEvent =
@@ -56,9 +60,9 @@ function toVimeo(raw: string): string {
  */
 const CHROME_CSS: Record<string, string> = {
   netflix:
-    '.watch-video--bottom-controls-container,.PlayerControlsNeo__bottom-controls,.PlayerControlsNeo__button-control-row,.watch-video--back-container,.watch-video--evidence-overlay-container{opacity:0!important;pointer-events:none!important;}',
+    '.watch-video--bottom-controls-container,.PlayerControlsNeo__bottom-controls,.PlayerControlsNeo__button-control-row,.PlayerControlsNeo__core-controls,.watch-video--back-container,.watch-video--evidence-overlay-container,[data-uia="controls-standard"],[data-uia="control-back"],[data-uia="video-title"],.watch-video--player-titletreatment-logo,.medialist-container,.nextEpisode,.skip-credits{opacity:0!important;pointer-events:none!important;}',
   prime:
-    '.atvwebplayersdk-bottompanel-container,.atvwebplayersdk-hideabletopbuttons-container,.atvwebplayersdk-timeindicator-text,.atvwebplayersdk-fastseekback-button,.atvwebplayersdk-fastseekforward-button,.atvwebplayersdk-playpause-button{opacity:0!important;pointer-events:none!important;}',
+    '.atvwebplayersdk-bottompanel-container,.atvwebplayersdk-hideabletopbuttons-container,.atvwebplayersdk-timeindicator-text,.atvwebplayersdk-fastseekback-button,.atvwebplayersdk-fastseekforward-button,.atvwebplayersdk-playpause-button,.atvwebplayersdk-title-text,.atvwebplayersdk-subtitle-text,.atvwebplayersdk-overflowmenu-button,.atvwebplayersdk-nexttitle-button,.atvwebplayersdk-skipelement-button,.atvwebplayersdk-infobar-container{opacity:0!important;pointer-events:none!important;}',
 };
 
 /**
@@ -80,9 +84,16 @@ function buildController(platform: string): string {
   function ensureStyle(){ if(!HIDE_CSS) return; if(document.getElementById('__astera_css')) return;
     try{var s=document.createElement('style');s.id='__astera_css';s.innerHTML=HIDE_CSS;(document.head||document.documentElement).appendChild(s);}catch(e){} }
   function findVideo(){
-    var best=null,area=-1,list=document.querySelectorAll('video');
-    for(var i=0;i<list.length;i++){var v=list[i];var r=v.getBoundingClientRect();var a=r.width*r.height;
-      if((v.src||v.currentSrc||v.readyState>0)&&a>=area){area=a;best=v;}}
+    // Pick the real feature, not a short trailer/preview loop. A long duration
+    // (>5min) and actively-playing-with-sound score far above raw size, so a
+    // muted autoplaying trailer never wins over the title the user chose.
+    var best=null,score=-1,list=document.querySelectorAll('video');
+    for(var i=0;i<list.length;i++){var v=list[i];
+      if(!(v.src||v.currentSrc||v.readyState>0))continue;
+      var r=v.getBoundingClientRect();var area=r.width*r.height;
+      var dur=isFinite(v.duration)?v.duration:0;
+      var s=area+(dur>300?4e9:0)+(!v.paused?1e9:0)+(!v.muted?5e8:0);
+      if(s>score){score=s;best=v;}}
     return best;
   }
   function isSignin(){
@@ -107,8 +118,25 @@ function buildController(platform: string): string {
     else if(cmd.type==='seek'){v.currentTime=cmd.time;}
     else if(cmd.type==='seekBy'){v.currentTime=Math.max(0,(v.currentTime||0)+cmd.delta);}
     else if(cmd.type==='mute'){v.muted=!!cmd.value;}}catch(e){}setTimeout(report,60);};
+  // Prime doesn't deep-link to playback, so a follower opening the detail page
+  // just sees the muted trailer. Nudge the provider's own "Play/İzle" button
+  // once to start the real title (never a "trailer/fragman" button). Best-effort
+  // and Prime-only so it can't disturb YouTube/Drive/Netflix.
+  var started=false;
+  function autostart(){
+    if(started||'${platform}'!=='prime')return;
+    var v=findVideo();
+    if(v&&isFinite(v.duration)&&v.duration>300&&!v.paused){started=true;return;}
+    var btns=document.querySelectorAll('button,a,[role=button]');
+    for(var i=0;i<btns.length;i++){var b=btns[i];var r=b.getBoundingClientRect();
+      if(r.width<40||r.height<20)continue;
+      var t=((b.getAttribute('aria-label')||'')+' '+(b.textContent||'')).toLowerCase();
+      if(/trailer|fragman|preview/.test(t))continue;
+      if(/\\bplay\\b|resume|watch now|izle|oynat|devam/.test(t)){
+        started=true;try{b.click();}catch(e){}return;}}
+  }
   ['play','pause','seeked','ended','loadedmetadata','canplay','timeupdate'].forEach(function(ev){document.addEventListener(ev,report,true);});
-  setInterval(report,800);ensureStyle();report();true;
+  setInterval(report,800);setInterval(autostart,1200);ensureStyle();report();true;
 })();
 `;
 }
@@ -122,7 +150,7 @@ export type WebPlayerHandle = {
 };
 
 export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
-  { uri, userAgent, platform, fill, onToggleFullscreen, fullscreen, onControl, canControl = true },
+  { uri, userAgent, platform, fill, onToggleFullscreen, fullscreen, onControl, canControl = true, onRequireProviderLogin },
   ref
 ) {
   const webRef = useRef<WebView>(null);
@@ -156,31 +184,15 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
   const controlsOpacity = useSharedValue(1);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Controls stay up: our overlay is box-none, so the YouTube iframe beneath it
+  // still receives taps (needed for "Skip Ad"). Auto-hiding + a full-screen
+  // touch-catcher used to swallow those taps, which is why ads couldn't be
+  // skipped on Android.
   const showControls = useCallback(() => {
     setControlsVisible(true);
     controlsOpacity.value = withTiming(1, { duration: 150 });
     if (hideTimer.current) clearTimeout(hideTimer.current);
-    // Only the (non-interactive) YouTube player auto-hides; WebView pages keep
-    // controls up so the site underneath stays reachable.
-    if (ytId) {
-      hideTimer.current = setTimeout(() => {
-        controlsOpacity.value = withTiming(0, { duration: 350 }, (f) => {
-          if (f) runOnJS(setControlsVisible)(false);
-        });
-      }, 3200);
-    }
-  }, [controlsOpacity, ytId]);
-
-  const toggleControls = useCallback(() => {
-    if (controlsVisible) {
-      if (hideTimer.current) clearTimeout(hideTimer.current);
-      controlsOpacity.value = withTiming(0, { duration: 220 }, (f) => {
-        if (f) runOnJS(setControlsVisible)(false);
-      });
-    } else {
-      showControls();
-    }
-  }, [controlsVisible, controlsOpacity, showControls]);
+  }, [controlsOpacity]);
 
   useEffect(() => {
     showControls();
@@ -339,9 +351,11 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
       style={[styles.container, fill && styles.containerFill]}
       onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
     >
-      {/* Media layer */}
+      {/* Media layer. For YouTube the iframe stays touch-enabled so the viewer
+          can hit YouTube's own "Skip Ad" button (our overlay is box-none, so
+          empty areas fall through to it). */}
       {ytId ? (
-        <View style={styles.ytLayer} pointerEvents="none">
+        <View style={styles.ytLayer}>
           {box.w > 0 && (
             <YoutubePlayer
               ref={ytRef}
@@ -416,22 +430,23 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
         />
       )}
 
-      {/* Tap the video to toggle controls. Plain RN Pressable so it doesn't
-          fight the Gesture-Handler control buttons layered above it. */}
-      {ytId && (
-        <Pressable
-          onPress={toggleControls}
-          style={StyleSheet.absoluteFill}
-          accessibilityLabel="Kontroller"
-        />
-      )}
-
-      {/* A provider sign-in gate is showing inside the embed — step aside so the
-          user can log in on the page itself, with just a hint at the top. */}
+      {/* Provider sign-in gate inside the embed. Co-watching: each viewer needs
+          their own session, so we offer a clean "Oturum aç" button that opens
+          the provider's login instead of leaving a raw web page in the player. */}
       {signin && !ytId && (
-        <View style={styles.signinHint} pointerEvents="none">
-          <Icon name="lock" size={13} color={palette.white} strokeWidth={2} />
-          <Text style={styles.signinText}>Bu cihazda hesabınızla giriş yapın</Text>
+        <View style={styles.signinCover}>
+          <View style={styles.signinCard}>
+            <Icon name="lock" size={22} color={palette.amber} strokeWidth={2} />
+            <Text style={styles.signinTitle}>Bu içeriği izlemek için giriş yap</Text>
+            <Text style={styles.signinSub}>Kendi hesabınla oturum aç; herkes kendi kopyasını izler, biz senkronu sağlarız.</Text>
+            {onRequireProviderLogin && (
+              <PressableScale onPress={onRequireProviderLogin} activeScale={0.96} accessibilityLabel="Oturum aç">
+                <View style={styles.signinBtn}>
+                  <Text style={styles.signinBtnText}>Oturum aç</Text>
+                </View>
+              </PressableScale>
+            )}
+          </View>
         </View>
       )}
 
@@ -596,20 +611,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   hostBadgeText: { ...typography.caption1, color: palette.white, fontWeight: '600' },
-  signinHint: {
-    position: 'absolute',
-    top: spacing.md,
-    alignSelf: 'center',
-    flexDirection: 'row',
+  signinCover: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.md,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    padding: spacing.lg,
+    backgroundColor: 'rgba(9,9,9,0.86)',
     zIndex: 5,
   },
-  signinText: { ...typography.caption1, color: palette.white, fontWeight: '600' },
+  signinCard: { alignItems: 'center', gap: spacing.sm, maxWidth: 360 },
+  signinTitle: { ...typography.headline, color: palette.white, fontWeight: '700', textAlign: 'center', marginTop: 2 },
+  signinSub: { ...typography.footnote, color: palette.textTertiary, textAlign: 'center' },
+  signinBtn: {
+    marginTop: spacing.sm,
+    height: 46,
+    paddingHorizontal: spacing.xxl,
+    borderRadius: radius.lg,
+    backgroundColor: palette.copper,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signinBtnText: { ...typography.headline, color: palette.white, fontWeight: '700' },
   bottom: { gap: spacing.xs },
   timeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   time: {

@@ -47,6 +47,7 @@ export type IconName =
   | 'grid'
   | 'compass'
   | 'crown'
+  | 'camera'
   | 'eye';
 
 type Props = {
@@ -125,6 +126,13 @@ function renderGlyph(
         <>
           <Line x1="12" y1="5" x2="12" y2="19" {...stroke} />
           <Line x1="5" y1="12" x2="19" y2="12" {...stroke} />
+        </>
+      );
+    case 'camera':
+      return (
+        <>
+          <Path d="M4 8.5a2 2 0 0 1 2-2h1.6l1-1.6a1.5 1.5 0 0 1 1.3-.7h4.2a1.5 1.5 0 0 1 1.3.7l1 1.6H18a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" {...stroke} />
+          <Circle cx="12" cy="12.5" r="3.2" {...stroke} />
         </>
       );
     case 'chevron-right':

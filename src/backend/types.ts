@@ -12,6 +12,7 @@ export type ProfileRow = {
   handle: string;
   display_name: string;
   avatar_tint: string;
+  avatar_url: string | null;
   minutes_watched: number;
   rooms_hosted: number;
   created_at: string;
@@ -128,6 +129,7 @@ export interface AuthedUser {
   handle: string;
   displayName: string;
   avatarTint: string;
+  avatarUrl: string | null;
 }
 
 /**

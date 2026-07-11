@@ -1,3 +1,5 @@
+import { decode } from 'base64-arraybuffer';
+
 import { palette } from '@/theme';
 import { storage, StorageKeys } from '@/storage/storage';
 
@@ -16,6 +18,7 @@ function profileToUser(row: ProfileRow): AuthedUser {
     handle: row.handle,
     displayName: row.display_name,
     avatarTint: row.avatar_tint,
+    avatarUrl: row.avatar_url ?? null,
   };
 }
 
@@ -55,6 +58,7 @@ export async function ensureSession(): Promise<AuthedUser | null> {
     handle: randomHandle(),
     display_name: displayName,
     avatar_tint: TINTS[Math.floor(Math.random() * TINTS.length)] ?? palette.copper,
+    avatar_url: null,
     minutes_watched: 0,
     rooms_hosted: 0,
     created_at: new Date().toISOString(),
@@ -161,4 +165,33 @@ export async function updateDisplayName(name: string): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
   await supabase.from('profiles').update({ display_name: name }).eq('id', user.id);
+}
+
+/**
+ * Upload a profile photo picked from the gallery. `base64` is the raw image
+ * (from expo-image-picker with base64:true); `ext` is jpg/png/webp. The file
+ * lands in the user's own folder (avatars/<uid>/…) — a fresh name each time so
+ * CDN caches never serve a stale photo — and the public URL is written back to
+ * profiles.avatar_url. Returns the URL on success or an error message.
+ */
+export async function uploadAvatar(base64: string, ext = 'jpg'): Promise<{ ok: boolean; url?: string; error?: string }> {
+  if (!supabase) return { ok: false, error: 'Bağlantı yok' };
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: 'Oturum bulunamadı' };
+
+  const contentType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+  const path = `${user.id}/avatar_${Date.now()}.${ext}`;
+
+  const { error: upErr } = await supabase.storage
+    .from('avatars')
+    .upload(path, decode(base64), { contentType, upsert: true });
+  if (upErr) return { ok: false, error: upErr.message };
+
+  const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+  const url = pub.publicUrl;
+
+  const { error: dbErr } = await supabase.from('profiles').update({ avatar_url: url }).eq('id', user.id);
+  if (dbErr) return { ok: false, error: dbErr.message };
+
+  return { ok: true, url };
 }

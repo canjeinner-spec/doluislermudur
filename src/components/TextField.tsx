@@ -23,6 +23,8 @@ type Props = {
   autoCapitalize?: TextInputProps['autoCapitalize'];
   /** Fixed, non-editable text shown before the input (e.g. "@"). */
   prefix?: string;
+  /** Always show a "used/max" counter (needs maxLength), not just on focus. */
+  showCounter?: boolean;
 };
 
 /** Rounded field with a focus ring that warms to the accent color. */
@@ -44,6 +46,7 @@ export function TextField({
   keyboardType,
   autoCapitalize,
   prefix,
+  showCounter = false,
 }: Props) {
   const [focused, setFocused] = useState(false);
 
@@ -90,9 +93,11 @@ export function TextField({
         onSubmitEditing={onSubmitEditing}
         accessibilityLabel={accessibilityLabel ?? placeholder}
       />
-      {maxLength != null && focused && (
+      {maxLength != null && showCounter ? (
+        <Text style={styles.counter}>{value.length}/{maxLength}</Text>
+      ) : maxLength != null && focused ? (
         <Text style={styles.counter}>{maxLength - value.length}</Text>
-      )}
+      ) : null}
       {trailing}
     </View>
   );

@@ -1,16 +1,21 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Icon, IconName } from '@/components/icons';
+import { Icon } from '@/components/icons';
 import { palette, radius, spacing, typography } from '@/theme';
 
-const VALUES: { icon: IconName; title: string; body: string }[] = [
-  { icon: 'lock', title: 'Gizlilik önce', body: 'Kimlik bilgilerin asla ASTERA’dan geçmez.' },
-  { icon: 'sparkle', title: 'Sinematik deneyim', body: 'Apple kalitesinde, sade ve premium tasarım.' },
-  { icon: 'users', title: 'Birlikte, her yerde', body: 'Arkadaşlarınla senkronize izleme keyfi.' },
+/** The heartfelt letter shown in "Hakkında" — a thank-you to the person using
+ *  ASTERA, kept as plain paragraphs so it reads like a note, not a marketing
+ *  page. The one emphasized line is pulled out for a little breathing room. */
+const LETTER: string[] = [
+  'Bu uygulamayı, sevdiklerine uzakta olan herkes için yaptım.',
+  'Ben de uzun mesafe ilişkisinin nasıl hissettirdiğini biliyorum. Sevdiğin insan kilometrelerce uzaktayken, bazen aynı filmi izlemek ya da birlikte birkaç saat geçirmek bile çok değerli oluyor.',
+  'İster sevgilinle, ister arkadaşlarınla, ister ailenle… Nerede olursanız olun aynı odadaymış gibi bir araya gelin. Birlikte izleyin, sohbet edin, gülün ve anılar biriktirin.',
+  'Eğer ASTERA, sevdiğin insanlarla arandaki mesafeyi olsa olsa birkaç saatliğine unutturabiliyorsa, amacına ulaşmış demektir.',
+  'Burada olduğun için teşekkür ederim. Umarım bu uygulama seni, değer verdiğin insanlara biraz daha yakın hissettirir.',
 ];
 
-/** App identity, tagline and guiding principles. */
+/** App identity and a personal thank-you note. */
 export function AboutSheet() {
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -23,26 +28,25 @@ export function AboutSheet() {
         <Text style={[typography.caption1, styles.version]}>Sürüm 1.0.0 (MVP)</Text>
       </View>
 
-      <Text style={[typography.body, styles.desc]}>
-        ASTERA, arkadaşlarınla senkronize izleme deneyimi sunar. Film, dizi ve video içeriklerini
-        birlikte izle, sohbet et ve anları paylaş — tıpkı aynı odadaymışsınız gibi.
-      </Text>
+      <View style={styles.letter}>
+        <Text style={[typography.caption1, styles.kicker]}>BİR TEŞEKKÜR</Text>
 
-      <View style={styles.values}>
-        {VALUES.map((v) => (
-          <View key={v.title} style={styles.value}>
-            <View style={styles.valueIcon}>
-              <Icon name={v.icon} size={18} color={palette.amber} />
-            </View>
-            <View style={styles.valueText}>
-              <Text style={[typography.subheadEmphasized, styles.valueTitle]}>{v.title}</Text>
-              <Text style={[typography.footnote, styles.valueBody]}>{v.body}</Text>
-            </View>
-          </View>
-        ))}
+        <Text style={[typography.body, styles.para]}>{LETTER[0]}</Text>
+        <Text style={[typography.body, styles.para]}>{LETTER[1]}</Text>
+
+        <Text style={[typography.title3, styles.pull]}>ASTERA tam da bu yüzden doğdu.</Text>
+
+        <Text style={[typography.body, styles.para]}>{LETTER[2]}</Text>
+        <Text style={[typography.body, styles.para]}>{LETTER[3]}</Text>
+        <Text style={[typography.body, styles.para]}>{LETTER[4]}</Text>
       </View>
 
-      <Text style={[typography.caption1, styles.credit]}>Made with ♥ · © 2026 ASTERA</Text>
+      <View style={styles.signoff}>
+        <Icon name="sparkle" size={14} color={palette.amber} />
+        <Text style={[typography.footnote, styles.signoffText]}>Sevgiyle yapıldı</Text>
+      </View>
+
+      <Text style={[typography.caption1, styles.credit]}>© 2026 ASTERA</Text>
     </ScrollView>
   );
 }
@@ -79,45 +83,37 @@ const styles = StyleSheet.create({
     color: palette.textTertiary,
     marginTop: 2,
   },
-  desc: {
-    color: palette.textSecondary,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
-  },
-  values: {
+  letter: {
     alignSelf: 'stretch',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
-  value: {
+  kicker: {
+    color: palette.amber,
+    letterSpacing: 2,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  para: {
+    color: palette.textSecondary,
+    lineHeight: 23,
+  },
+  pull: {
+    color: palette.textPrimary,
+    textAlign: 'center',
+    marginVertical: spacing.xs,
+  },
+  signoff: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: palette.surfaceSecondary,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: palette.glassBorder,
+    gap: 6,
+    marginTop: spacing.xl,
   },
-  valueIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.sm,
-    backgroundColor: palette.accentTintSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  valueText: {
-    flex: 1,
-    gap: 1,
-  },
-  valueTitle: {
-    color: palette.textPrimary,
-  },
-  valueBody: {
+  signoffText: {
     color: palette.textSecondary,
   },
   credit: {
     color: palette.textTertiary,
-    marginTop: spacing.xl,
+    marginTop: spacing.sm,
   },
 });

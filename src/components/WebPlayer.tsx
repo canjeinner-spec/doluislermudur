@@ -203,6 +203,13 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
   const controller = React.useMemo(() => buildController(platform ?? ''), [platform]);
   // DRM providers cross-check the full browser fingerprint; present desktop Chrome.
   const beforeLoad = platform === 'netflix' || platform === 'prime' ? DESKTOP_SPOOF : undefined;
+  // A cold /watch load has no Netflix client state (localStorage/ESN/Widevine
+  // provisioning) — cookies are shared between WebViews but localStorage is not —
+  // so the DRM session can't establish → E100. Warm netflix.com first, then go to
+  // the title so the player provisions like a normal browsing session.
+  const isNetflix = platform === 'netflix';
+  const startUri = isNetflix ? 'https://www.netflix.com/' : vimeoUri;
+  const warmedRef = useRef(false);
 
   // For YouTube, `playing` starts false and is flipped to true in onReady — that
   // change is what injects playVideo *after* the player exists. It then tracks
@@ -452,11 +459,21 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
       ) : (
         <WebView
           ref={webRef}
-          source={{ uri: vimeoUri }}
+          source={{ uri: startUri }}
           style={styles.web}
           injectedJavaScriptBeforeContentLoaded={beforeLoad}
           injectedJavaScript={controller}
           onMessage={onWebMessage}
+          onLoadEnd={() => {
+            // netflix.com is warm (Widevine provisioned, ESN + localStorage set)
+            // → now navigate to the actual title so DRM can establish.
+            if (isNetflix && !warmedRef.current) {
+              warmedRef.current = true;
+              webRef.current?.injectJavaScript(
+                `setTimeout(function(){location.href=${JSON.stringify(vimeoUri)};},1200);true;`
+              );
+            }
+          }}
           allowsInlineMediaPlayback
           mediaPlaybackRequiresUserAction={false}
           allowsFullscreenVideo={false}

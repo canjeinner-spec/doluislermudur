@@ -66,6 +66,38 @@ const CHROME_CSS: Record<string, string> = {
 };
 
 /**
+ * COMPLETE, CONSISTENT desktop-Chrome fingerprint, injected before the page's
+ * scripts. Netflix/Prime don't just read the UA string — they cross-check
+ * `navigator.platform`/`vendor`/`plugins`, `screen` size and Client Hints
+ * (`userAgentData`). A WebView with a desktop UA but a 412×915 phone screen is a
+ * dead giveaway → "bu içerik anında izleme için mevcut değil". This presents a
+ * real, common 1080p Windows-Chrome fingerprint (from Rave's weighted UA
+ * dataset) with every field agreeing. Presentation only — no DRM tampering.
+ */
+const DESKTOP_SPOOF = `
+(function(){try{
+  function def(o,p,v){try{Object.defineProperty(o,p,{configurable:true,get:function(){return v;}});}catch(e){}}
+  def(navigator,'platform','Win32');
+  def(navigator,'vendor','Google Inc.');
+  def(navigator,'maxTouchPoints',0);
+  def(navigator,'webdriver',false);
+  def(navigator,'plugins',{length:5});
+  def(screen,'width',1920); def(screen,'height',1080);
+  def(screen,'availWidth',1920); def(screen,'availHeight',1040);
+  def(screen,'colorDepth',24); def(screen,'pixelDepth',24);
+  var uaData={
+    brands:[{brand:'Chromium',version:'124'},{brand:'Google Chrome',version:'124'},{brand:'Not-A.Brand',version:'99'}],
+    mobile:false, platform:'Windows',
+    getHighEntropyValues:function(){return Promise.resolve({architecture:'x86',bitness:'64',model:'',platform:'Windows',platformVersion:'15.0.0',uaFullVersion:'124.0.0.0',fullVersionList:[{brand:'Google Chrome',version:'124.0.0.0'},{brand:'Chromium',version:'124.0.0.0'},{brand:'Not-A.Brand',version:'99.0.0.0'}],mobile:false});},
+    toJSON:function(){return {brands:this.brands,mobile:false,platform:'Windows'};}
+  };
+  def(navigator,'userAgentData',uaData);
+  if(!window.chrome){window.chrome={runtime:{},app:{isInstalled:false},csi:function(){},loadTimes:function(){}};}
+}catch(e){}})();
+true;
+`;
+
+/**
  * Injected into every WebView provider page (Netflix, Prime, Drive, …). It:
  *   • finds the real content <video> (largest with a live source),
  *   • reports playback state so our overlay stays in sync,
@@ -169,6 +201,8 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
   const ytId = React.useMemo(() => extractYouTubeId(uri), [uri]);
   const vimeoUri = React.useMemo(() => toVimeo(uri), [uri]);
   const controller = React.useMemo(() => buildController(platform ?? ''), [platform]);
+  // DRM providers cross-check the full browser fingerprint; present desktop Chrome.
+  const beforeLoad = platform === 'netflix' || platform === 'prime' ? DESKTOP_SPOOF : undefined;
 
   // For YouTube, `playing` starts false and is flipped to true in onReady — that
   // change is what injects playVideo *after* the player exists. It then tracks
@@ -420,6 +454,7 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
           ref={webRef}
           source={{ uri: vimeoUri }}
           style={styles.web}
+          injectedJavaScriptBeforeContentLoaded={beforeLoad}
           injectedJavaScript={controller}
           onMessage={onWebMessage}
           allowsInlineMediaPlayback

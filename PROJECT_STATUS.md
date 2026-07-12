@@ -1,7 +1,7 @@
 # ASTERA — Proje Durumu
 
 > Senkron izleme partisi uygulaması (Rave benzeri). React Native + Expo + TypeScript.
-> Bu dosya "A'dan Z'ye ne yaptık, ne kaldı" özetidir. Son güncelleme: 2026-07-10.
+> Bu dosya "A'dan Z'ye ne yaptık, ne kaldı" özetidir. Son güncelleme: 2026-07-12.
 
 ---
 
@@ -110,6 +110,11 @@ Backend `isBackendConfigured` arkasında; yapılandırılmadıysa mock veriye d�
 - **İlk açılış teşekkür ekranı** (`WelcomeScreen`): uzun mesafe/arkadaşlar için kişisel not +
   Instagram @ardaowskix; yalnızca ilk açılışta, Onboarding'den önce.
 - **Bilgilendirme (About) sadeleştirildi:** kısa tanıtım + büyüme notu + Instagram @ardaowskix + teşekkür.
+- **Co-watching giriş kapısı:** oynatıcıda platform giriş kapısı çıkınca ham WebView yerine "Oturum aç"
+  butonu → `WebViewLogin` loginOnly → dönünce oynatıcı paylaşılan çerezle yeniden yüklenir.
+- **Oda re-entry çökmesi düzeltildi:** presence kanalı (stabil topic) eski kanalı temizlemeden yeniden
+  açılınca "cannot add presence callbacks after subscribe()" patlıyordu → artık eski kanal önce kapatılıyor.
+- **EAS build + dev client workflow** kuruldu (bkz. §8) — buluttan PC'siz build; JS değişikliği anında.
 - **Sohbette katılım bildirimleri:** biri odaya girince/çıkınca/atılınca sohbete "{ad} katıldı /
   ayrıldı / atıldı" sistem satırı (avatarıyla) düşer. **Supabase Realtime Presence** ile üretilir
   (`openRoomPresence`) — anlık, iOS+Android'de aynı, sınırsız gir/çık döngüsüne dayanıklı, DB/RLS
@@ -126,11 +131,22 @@ Backend `isBackendConfigured` arkasında; yapılandırılmadıysa mock veriye d�
 
 ## 6. Ertelenenler / bilinen sınırlar ⏳
 
-- **Android'de YouTube sesi** — muted autoplay çalışıyor; sesi açmak (unmute) cross-origin
-  iframe jesti gerektirdiği için enjeksiyonla çözülemiyor → **native dev build**'e ertelendi.
-- **Netflix / Prime DRM** — Widevine/FairPlay; Expo Go/WebView'de tam oynatma yok →
-  native dev build gerekiyor.
-- Google Drive için "wordmark" logo yok (sadece üçgen sembol).
+- **Android'de YouTube sesi** — native build'de **çözüldü** (unmute çalışıyor). Ayrıca YouTube
+  reklamı: iframe artık dokunulabilir → "Skip Ad" basılabiliyor (reklamın kendisi embed sınırı).
+- **Netflix / Prime DRM — aktif araştırma (co-watching modeli):**
+  - Model: DRM bypass DEĞİL. Herkes **kendi hesabıyla** girer, kendi kopyasını izler; ASTERA yalnızca
+    oynat/durdur/seek **senkronunu** sağlar. Oynatıcıda giriş kapısı çıkınca ham WebView yerine
+    **"Oturum aç"** butonu → platformun login ekranı (`WebViewLogin` loginOnly) → dönünce oynatıcı
+    paylaşılan çerezle yeniden yüklenir.
+  - **Prime:** büyük ölçüde çalışıyor (ana içerik seçimi + chrome gizleme + "Oynat" tetikleme).
+  - **Netflix:** hâlâ "Bu içerik anında izleme için mevcut değil" veriyor. **ÖNEMLİ bulgu:** rakip
+    **Turtle**, Netflix'i bir **Android WebView içinde gerçekten oynatıyor** (ekran görüntüsü hareketli
+    kareyi yakalıyor → web **L3**, donanım-güvenli yüzey yok). Yani bu **aşılabilir bir duvar** — imkânsız
+    değil. Denenenler: masaüstü UA ✅, `allowsProtectedMedia` ✅, warm-load (kaldırıldı), navigator
+    tahrifat spoof'u (kaldırıldı — ters tepti), **Client Hints spoof'u** (`navigator.userAgentData` =
+    masaüstü, `platform=Win32`, `maxTouchPoints=0`) — modern Netflix UA string yerine Client Hints okur,
+    en güçlü aday buydu. Sıradaki: **Rave'in decompile dosyalarını inceleyip birebir reçeteyi bulmak.**
+- **Avatar yükleme** artık BİTTİ (bkz. §5). Google Drive için "wordmark" logo yok (sadece üçgen sembol).
 
 ---
 
@@ -139,29 +155,43 @@ Backend `isBackendConfigured` arkasında; yapılandırılmadıysa mock veriye d�
 1. **`007_avatar_upload.sql` + `008_realtime_profiles.sql`'i Supabase SQL editöründe çalıştır**
    — 007 olmadan avatar yükleme "bucket not found" verir; 008 olmadan profil değişiklikleri
    odaya anlık yansımaz. 002–006 zaten doğrulandı ✅.
-2. Native dev build al → Android ses + Netflix/Prime DRM'i gerçek cihazda test et.
-3. Oda içi "kimler izliyor" ve host devri uç durumlarının cihazda testi.
-4. Yayın öncesi: hata/analitik, boş durum ekranları, ince tasarım geçişleri.
+2. **Netflix WebView reçetesi** — Rave'in dosyalarını inceleyip UA/enjekte-JS/WebView config'ini
+   birebir kopyala (Turtle'ın çalıştığı kanıtlı). Prime senkron cilası.
+3. **Senkronu sıkılaştır** — host oynat/durdur/seek yapınca herkes otomatik takip etsin (DRM'in
+   ilk dokunuş şartı hariç).
+4. Oda içi host devri uç durumları + yayın öncesi cila (hata/analitik, boş durum ekranları).
 
 ---
 
-## 8. Çalıştırma
+## 8. Çalıştırma & build
 
+### Yerel / bulut geliştirme (Metro)
 ```bash
 npm install
-npm start          # expo start (Metro, port 8081)
-npm run typecheck  # tsc --noEmit
-npm run lint
+EXPO_FORCE_WEBCONTAINER_ENV=1 npx expo start   # Bolt tüneli (bulut sandbox → telefon)
+npm run typecheck                              # tsc --noEmit
 ```
+- Ortam değişkenleri **`.env`** (gitignore'lu): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+  ⚠️ `.env` yoksa uygulama mock veriye düşer. (Bir kez kaybolduysa yeniden oluştur + Metro'yu restart et.)
+- Telefondan bağlanmak için Metro'nun bastığı `exp+astera://<alt-alan>.boltexpo.dev` linki kullanılır
+  (her `expo start`'ta alt-alan adı değişebilir).
 
-Ortam değişkenleri (`.env`): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+### Native build (EAS) — PC'siz, buluttan alınıyor
+- Expo hesabı: **rjkovicx** · proje: **@rjkovicx/astera** (`eas.json`'da 3 profil, Supabase env gömülü).
+- **Dev client (development profili)** bir kez kurulunca → tüm JS/UI/WebPlayer değişiklikleri **Metro
+  üzerinden anında** (build beklemeden). DRM/Widevine dev client'ta da çalışır. Native değişiklikte rebuild.
+- `eas build -p android --profile development` (dev client) / `--profile preview` (dağıtılabilir APK).
+- **Not:** `expo-dev-client` SDK 54 için **~6.0.21** olmalı (yanlış sürüm Gradle'ı patlatır).
 
-> 🔐 **Güvenlik notu:** Supabase **secret** anahtarı hiçbir zaman uygulamaya/repoya konmaz;
-> yalnızca anon key kullanılır. Secret paylaşıldıysa Supabase panelinden **rotate** edilmeli.
+> 🔐 **Güvenlik notu:** Supabase **secret** anahtarı asla repoya konmaz; yalnızca **publishable/anon**
+> key kullanılır (bundle'da zaten görünür, güvenli). Secret sızarsa panelden **rotate** edilir.
 
 ---
 
 ## 9. Geliştirme dalı
 
-Tüm geliştirme `claude/astera-watchparty-mvp-8x5k5g` dalında. Commit'ler açıklamalı;
-iş tamamlandıkça bu dala push'lanıyor.
+Aktif dal: **`claude/astera-watchparty-mvp-4g6xkz`**. Commit'ler açıklamalı; iş tamamlandıkça push'lanıyor.
+
+> Not: DRM/WebView deneyleri sırasında uzun oturumda `node_modules` ve `.env` bir kez bozuldu/kayboldu
+> → `npm install` + `.env` yeniden oluşturma + Metro restart ile toparlandı. Metro'yu restart ederken
+> 8081 portundaki eski süreci öldürmek gerekir (yoksa yeni Metro `.env`'siz eskisine düşer).

@@ -54,41 +54,16 @@ function toVimeo(raw: string): string {
 }
 
 /**
- * CSS that hides a provider's own player chrome (bottom scrubber, top bar) so
- * only ASTERA's overlay drives playback — "the controller is ours, the embed is
- * theirs". Selectors are best-effort; anything unmatched just stays visible.
+ * CSS that hides only the provider's signup / ads / purchase clutter — NOT the
+ * player itself. Mirrors Rave's approach (netflix.js / amazon.js): keep the real
+ * player untouched so DRM playback initialises normally; just strip the noise.
  */
 const CHROME_CSS: Record<string, string> = {
   netflix:
-    '.watch-video--bottom-controls-container,.PlayerControlsNeo__bottom-controls,.PlayerControlsNeo__button-control-row,.PlayerControlsNeo__core-controls,.watch-video--back-container,.watch-video--evidence-overlay-container,[data-uia="controls-standard"],[data-uia="control-back"],[data-uia="video-title"],.watch-video--player-titletreatment-logo,.medialist-container,.nextEpisode,.skip-credits{opacity:0!important;pointer-events:none!important;}',
+    '[data-uia="email-form"],[data-uia="ads-plan-rich-banner"],[href*="https://netflix.shop/"],button[data-uia=login-toggle-button],p:has(~ button[data-uia=login-toggle-button]){display:none!important;}',
   prime:
-    '.atvwebplayersdk-bottompanel-container,.atvwebplayersdk-hideabletopbuttons-container,.atvwebplayersdk-timeindicator-text,.atvwebplayersdk-fastseekback-button,.atvwebplayersdk-fastseekforward-button,.atvwebplayersdk-playpause-button,.atvwebplayersdk-title-text,.atvwebplayersdk-subtitle-text,.atvwebplayersdk-overflowmenu-button,.atvwebplayersdk-nexttitle-button,.atvwebplayersdk-skipelement-button,.atvwebplayersdk-infobar-container{opacity:0!important;pointer-events:none!important;}',
+    '[href*="/storefront/?merchId=RentBuy"],[action*="/acquisition"],[name="more-purchase-options"]{display:none!important;}',
 };
-
-/**
- * Full desktop-Chrome impersonation, injected BEFORE the provider's scripts.
- * A spoofed UA string alone is not enough: modern Netflix reads **Client Hints**
- * (`navigator.userAgentData`), which in an Android WebView reports `mobile:true`
- * / `platform:"Android"` regardless of the UA — so Netflix treats it as mobile
- * and refuses web playback. We also fix `navigator.platform` and
- * `maxTouchPoints` (a real desktop has no touch). This is presentation only — it
- * does not touch DRM.
- */
-const DESKTOP_SPOOF = `
-(function(){try{
-  var uaData={
-    brands:[{brand:'Chromium',version:'124'},{brand:'Google Chrome',version:'124'},{brand:'Not-A.Brand',version:'99'}],
-    mobile:false, platform:'Windows',
-    getHighEntropyValues:function(){return Promise.resolve({architecture:'x86',bitness:'64',model:'',platform:'Windows',platformVersion:'15.0.0',uaFullVersion:'124.0.0.0',fullVersionList:[{brand:'Google Chrome',version:'124.0.0.0'},{brand:'Chromium',version:'124.0.0.0'}],mobile:false});},
-    toJSON:function(){return {brands:this.brands,mobile:false,platform:'Windows'};}
-  };
-  try{Object.defineProperty(navigator,'userAgentData',{configurable:true,get:function(){return uaData;}});}catch(e){}
-  try{Object.defineProperty(navigator,'platform',{configurable:true,get:function(){return 'Win32';}});}catch(e){}
-  try{Object.defineProperty(navigator,'maxTouchPoints',{configurable:true,get:function(){return 0;}});}catch(e){}
-  try{if(!window.chrome){window.chrome={runtime:{}};}}catch(e){}
-}catch(e){}})();
-true;
-`;
 
 /**
  * Injected into every WebView provider page (Netflix, Prime, Drive, …). It:
@@ -108,11 +83,22 @@ function buildController(platform: string): string {
   function post(o){ try { RNW.postMessage(JSON.stringify(o)); } catch (e) {} }
   function ensureStyle(){ if(!HIDE_CSS) return; if(document.getElementById('__astera_css')) return;
     try{var s=document.createElement('style');s.id='__astera_css';s.innerHTML=HIDE_CSS;(document.head||document.documentElement).appendChild(s);}catch(e){} }
+  function allVideos(){
+    // Same-origin iframes too — some providers render the player in one, and a
+    // top-level querySelectorAll would miss it (Rave traverses iframes as well).
+    var list=[].slice.call(document.getElementsByTagName('video'));
+    var frames=document.getElementsByTagName('iframe');
+    for(var f=0;f<frames.length;f++){try{
+      var doc=frames[f].contentDocument||(frames[f].contentWindow&&frames[f].contentWindow.document);
+      if(doc){var fv=doc.getElementsByTagName('video');for(var k=0;k<fv.length;k++)list.push(fv[k]);}
+    }catch(e){/* cross-origin */}}
+    return list;
+  }
   function findVideo(){
     // Pick the real feature, not a short trailer/preview loop. A long duration
     // (>5min) and actively-playing-with-sound score far above raw size, so a
     // muted autoplaying trailer never wins over the title the user chose.
-    var best=null,score=-1,list=document.querySelectorAll('video');
+    var best=null,score=-1,list=allVideos();
     for(var i=0;i<list.length;i++){var v=list[i];
       if(!(v.src||v.currentSrc||v.readyState>0))continue;
       var r=v.getBoundingClientRect();var area=r.width*r.height;
@@ -183,8 +169,6 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
   const ytId = React.useMemo(() => extractYouTubeId(uri), [uri]);
   const vimeoUri = React.useMemo(() => toVimeo(uri), [uri]);
   const controller = React.useMemo(() => buildController(platform ?? ''), [platform]);
-  // DRM providers verify the browser via Client Hints; present desktop Chrome.
-  const beforeLoad = platform === 'netflix' || platform === 'prime' ? DESKTOP_SPOOF : undefined;
 
   // For YouTube, `playing` starts false and is flipped to true in onReady — that
   // change is what injects playVideo *after* the player exists. It then tracks
@@ -436,7 +420,6 @@ export const WebPlayer = forwardRef<WebPlayerHandle, Props>(function WebPlayer(
           ref={webRef}
           source={{ uri: vimeoUri }}
           style={styles.web}
-          injectedJavaScriptBeforeContentLoaded={beforeLoad}
           injectedJavaScript={controller}
           onMessage={onWebMessage}
           allowsInlineMediaPlayback

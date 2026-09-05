@@ -18,6 +18,27 @@
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_CclTNSxK_hWZq5RnT3xeog_d0rnQCVF"
       }
     },
+    "development-simulator": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://frzctjwxzutfentjcrew.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_CclTNSxK_hWZq5RnT3xeog_d0rnQCVF"
+      }
+    },
+    "preview-simulator": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://frzctjwxzutfentjcrew.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_CclTNSxK_hWZq5RnT3xeog_d0rnQCVF"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "android": {

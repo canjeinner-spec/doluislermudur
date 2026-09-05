@@ -1,0 +1,90 @@
+
+name: iOS unsigned IPA
+
+# Builds an unsigned .ipa on a GitHub-hosted macOS runner so the app can be
+# signed on-device with a personal Apple ID (AltStore / SideStore / Sideloadly)
+# instead of an ad-hoc profile from a paid Apple Developer account.
+#
+# Debug builds contain the expo-dev-client and load JS from Metro; Release
+# builds embed the bundle and run standalone.
+
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: Xcode configuration
+        type: choice
+        options: [Debug, Release]
+        default: Debug
+
+concurrency:
+  group: ios-unsigned-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: https://frzctjwxzutfentjcrew.supabase.co
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_CclTNSxK_hWZq5RnT3xeog_d0rnQCVF
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Generate the native iOS project
+        run: npx expo prebuild --platform ios --no-install
+
+      - name: Install pods
+        working-directory: ios
+        run: pod install
+
+      # prebuild derives the scheme from app.json's name, so read it back
+      # rather than hardcoding it here.
+      - name: Resolve workspace and scheme
+        id: xcode
+        working-directory: ios
+        run: |
+          workspace=$(ls -d *.xcworkspace | head -1)
+          echo "workspace=$workspace" >> "$GITHUB_OUTPUT"
+          echo "scheme=${workspace%.xcworkspace}" >> "$GITHUB_OUTPUT"
+
+      - name: Build without signing
+        working-directory: ios
+        run: |
+          xcodebuild \
+            -workspace "${{ steps.xcode.outputs.workspace }}" \
+            -scheme "${{ steps.xcode.outputs.scheme }}" \
+            -configuration "${{ inputs.configuration }}" \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            | xcpretty && exit "${PIPESTATUS[0]}"
+
+      # An .ipa is just a zip with the .app inside a Payload/ directory.
+      - name: Package the IPA
+        working-directory: ios
+        run: |
+          products="build/Build/Products/${{ inputs.configuration }}-iphoneos"
+          app=$(ls -d "$products"/*.app | head -1)
+          mkdir -p Payload
+          cp -R "$app" Payload/
+          zip -qry "${{ steps.xcode.outputs.scheme }}-unsigned.ipa" Payload
+          ls -lh *.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: astera-ios-${{ inputs.configuration }}-unsigned
+          path: ios/*.ipa
+          retention-days: 14
